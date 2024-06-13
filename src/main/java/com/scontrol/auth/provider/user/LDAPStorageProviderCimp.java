@@ -12,7 +12,7 @@ import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.*;
 //import org.keycloak.credential.hash.PasswordHashProvider;
-import org.keycloak.federation.kerberos.KerberosPrincipal;
+//import org.keycloak.federation.kerberos.KerberosPrincipal;
 import org.keycloak.models.*;
 import org.keycloak.models.cache.CachedUserModel;
 import org.keycloak.models.cache.UserCache;
@@ -625,15 +625,15 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             if(getLdapIdentityStore().getConfig().isTrustEmail()){
                 imported.setEmailVerified(true);
             }
-            if (kerberosConfig.isAllowKerberosAuthentication() && kerberosConfig.getKerberosPrincipalAttribute() != null) {
-                String kerberosPrincipal = ldapUser.getAttributeAsString(kerberosConfig.getKerberosPrincipalAttribute());
-                if (kerberosPrincipal == null) {
-                    logger.warnf("Kerberos principal attribute not found on LDAP user [%s]. Configured kerberos principal attribute name is [%s]", ldapUser.getDn(), kerberosConfig.getKerberosPrincipalAttribute());
-                } else {
-                    KerberosPrincipal kerberosPrinc = new KerberosPrincipal(kerberosPrincipal);
-                    imported.setSingleAttribute(KerberosConstants.KERBEROS_PRINCIPAL, kerberosPrinc.toString());
-                }
-            }
+//            if (kerberosConfig.isAllowKerberosAuthentication() && kerberosConfig.getKerberosPrincipalAttribute() != null) {
+//                String kerberosPrincipal = ldapUser.getAttributeAsString(kerberosConfig.getKerberosPrincipalAttribute());
+//                if (kerberosPrincipal == null) {
+//                    logger.warnf("Kerberos principal attribute not found on LDAP user [%s]. Configured kerberos principal attribute name is [%s]", ldapUser.getDn(), kerberosConfig.getKerberosPrincipalAttribute());
+//                } else {
+//                    KerberosPrincipal kerberosPrinc = new KerberosPrincipal(kerberosPrincipal);
+//                    imported.setSingleAttribute(KerberosConstants.KERBEROS_PRINCIPAL, kerberosPrinc.toString());
+//                }
+//            }
             logger.debugf("Imported new user from LDAP to Keycloak DB. Username: [%s], Email: [%s], LDAP_ID: [%s], LDAP Entry DN: [%s]", imported.getUsername(), imported.getEmail(),
                     ldapUser.getUuid(), userDN);
             UserModel proxy = proxy(realm, imported, ldapUser, false);

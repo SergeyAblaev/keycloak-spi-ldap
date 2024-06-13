@@ -11,8 +11,6 @@ import org.keycloak.provider.ProviderConfigurationBuilder;
 import org.keycloak.storage.*;
 import org.keycloak.storage.ldap.*;
 import org.keycloak.storage.ldap.mappers.LDAPConfigDecorator;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.storage.ldap.mappers.LDAPStorageMapper;
 
@@ -21,12 +19,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.*;
-//import static com.baeldung.com.scontrol.auth.provider.user.CustomUserStorageProviderConstants.*;
 
 public class CimpUserStorageProviderFactory implements UserStorageProviderFactory<LDAPStorageProviderCimp>
         //UserStorageProviderFactory<LDAPStorageProvider> , ImportSynchronization
 {
-    //    private static final Logger log = LoggerFactory.getLogger(CimpUserStorageProviderFactory.class);
 
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderFactory.class);
     protected final List<ProviderConfigProperty> configProperties;
