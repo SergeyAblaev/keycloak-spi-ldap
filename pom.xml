@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>info.furbach</groupId>
-    <artifactId>spi-keycloak-emailnotification</artifactId>
+    <groupId>org.scontrol</groupId>
+    <artifactId>spi-cimp-ldap</artifactId>
     <version>1.0.1</version>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>11</maven.compiler.release>
-        <version.org.keycloak>16.0.0</version.org.keycloak>
+        <version.org.keycloak>23.0.7</version.org.keycloak>
         <version.org.jboss.logging>3.4.1.Final</version.org.jboss.logging>
     </properties>
 
@@ -61,6 +61,11 @@
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-core</artifactId>
+            <version>${version.org.keycloak}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-ldap-federation</artifactId>
             <version>${version.org.keycloak}</version>
         </dependency>
         <dependency>
