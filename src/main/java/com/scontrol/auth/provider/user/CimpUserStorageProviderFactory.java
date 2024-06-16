@@ -11,6 +11,8 @@ import org.keycloak.provider.ProviderConfigurationBuilder;
 import org.keycloak.storage.*;
 import org.keycloak.storage.ldap.*;
 import org.keycloak.storage.ldap.mappers.LDAPConfigDecorator;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.storage.ldap.mappers.LDAPStorageMapper;
 
@@ -19,10 +21,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.*;
+//import static com.baeldung.auth.provider.user.CustomUserStorageProviderConstants.*;
 
 public class CimpUserStorageProviderFactory implements UserStorageProviderFactory<LDAPStorageProviderCimp>
         //UserStorageProviderFactory<LDAPStorageProvider> , ImportSynchronization
 {
+    //    private static final Logger log = LoggerFactory.getLogger(CimpUserStorageProviderFactory.class);
 
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderFactory.class);
     protected final List<ProviderConfigProperty> configProperties;
@@ -126,7 +130,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     //Todo used aal the time for user searsh
     @Override
     public LDAPStorageProviderCimp create(KeycloakSession session, ComponentModel model)  {
-        logger.infof("[I63] cimp. creating new CustomUserStorageProvider");
+        logger.infof("[cimp] . creating new CustomUserStorageProvider");
 
         Map<ComponentModel, LDAPConfigDecorator> configDecorators = getLDAPConfigDecorators(session, model);
         LDAPIdentityStoreCimp ldapIdentityStore = this.ldapStoreRegistry.getLdapStore(session, model, configDecorators);
@@ -144,18 +148,11 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     }
 
 
-//    @Override
-//    public LDAPStorageProvider create(KeycloakSession session, ComponentModel model) {
-//        Map<ComponentModel, LDAPConfigDecorator> configDecorators = getLDAPConfigDecorators(session, model);
-//
-//        LDAPIdentityStore ldapIdentityStore = this.ldapStoreRegistry.getLdapStore(session, model, configDecorators);
-//        return new LDAPStorageProvider(this, session, model, ldapIdentityStore);
-//    }
 
 
     @Override
     public String getId() {
-        logger.infof("[CIMP] cimp. getId()");
+        logger.info("[CIMP] cimp. getId()");
         return "cimp-user-provider";
     }
 
@@ -163,6 +160,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     // Configuration support methods
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
+        logger.info("[CIMP] getConfigProperties");
         return configProperties;
     }
 
@@ -170,11 +168,11 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     public void validateConfiguration(KeycloakSession session, RealmModel realm, ComponentModel config) throws ComponentValidationException {
 
 //       try (Connection c = DbUtil.getConnection(config)) {
-        logger.infof("[CIMP] Testing connection...");
+        logger.info("[CIMP] Testing connection...");
 //           c.createStatement().execute(config.get(CONFIG_KEY_VALIDATION_QUERY));
         //Todo here is get DOMAIN connect! тут надо просто запрос как пинг без имени можно такое?
 
-        logger.infof("[CIMP] Connection OK !");
+        logger.info("[CIMP] Connection OK !");
 //       }
 //       catch(Exception ex) {
 //           log.warn("[CIMP] Unable to validate connection: ex={}", ex.getMessage());
@@ -184,6 +182,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     @Override
     public void init(Config.Scope config) {
+        logger.info("[CIMP] init");
         this.ldapStoreRegistry = new LDAPIdentityStoreRegistryCimp();
     }
 
