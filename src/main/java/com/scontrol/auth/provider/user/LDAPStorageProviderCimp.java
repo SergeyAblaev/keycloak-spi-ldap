@@ -168,6 +168,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     }
 
     public CimpStorageUserManager getUserManager() {
+        logger.info("[Cimp] getUserManager");
         return userManager;
     }
 
@@ -297,6 +298,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     }
 
     protected LDAPObject queryByEmail(RealmModel realm, String email) {
+        logger.info("[Cimp] queryByEmail");
         try (LDAPQueryCimp ldapQuery = LDAPUtilsCimp.createQueryForUserSearch(this, realm)) {
             LDAPQueryConditionsBuilder conditionsBuilder = new LDAPQueryConditionsBuilder();
 

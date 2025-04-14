@@ -156,6 +156,7 @@ public class LDAPQueryCimp implements AutoCloseable {
 
 
     public List<LDAPObject> getResultList() {
+        logger.infof("[cimp] getResultList");
 
         // Apply mappers now
         LDAPMappersComparator ldapMappersComparator = new LDAPMappersComparator(ldapFedProvider.getLdapIdentityStore().getConfig());
