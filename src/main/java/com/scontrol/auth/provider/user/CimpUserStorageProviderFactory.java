@@ -29,11 +29,13 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     //    private static final Logger log = LoggerFactory.getLogger(CimpUserStorageProviderFactory.class);
 
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderFactory.class);
+    public static final String CIMP_TAG = "[CIMP] ";
     protected final List<ProviderConfigProperty> configProperties;
     private LDAPIdentityStoreRegistryCimp ldapStoreRegistry;
+    public static Map<String, String> domainMap;
 
     public CimpUserStorageProviderFactory() {
-        logger.infof("[CIMP] cimp. CustomUserStorageProviderFactory created");
+        logger.infof(CIMP_TAG + "cimp. CustomUserStorageProviderFactory created");
 
         // Create config metadata  dn "CN=Users, DC=cimpdomain1, DC=com"
         configProperties = ProviderConfigurationBuilder.create()
@@ -152,7 +154,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     @Override
     public String getId() {
-        logger.info("[CIMP] cimp. getId()");
+        logger.info(CIMP_TAG + "cimp. getId()");
         return "cimp-user-provider";
     }
 
@@ -160,7 +162,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     // Configuration support methods
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        logger.info("[CIMP] getConfigProperties");
+        logger.info(CIMP_TAG + "getConfigProperties");
         return configProperties;
     }
 
@@ -168,11 +170,11 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     public void validateConfiguration(KeycloakSession session, RealmModel realm, ComponentModel config) throws ComponentValidationException {
 
 //       try (Connection c = DbUtil.getConnection(config)) {
-        logger.info("[CIMP] Testing connection...");
+        logger.info(CIMP_TAG + "Testing connection...");
 //           c.createStatement().execute(config.get(CONFIG_KEY_VALIDATION_QUERY));
         //Todo here is get DOMAIN connect! тут надо просто запрос как пинг без имени можно такое?
 
-        logger.info("[CIMP] Connection OK !");
+        logger.info(CIMP_TAG + "Connection OK !");
 //       }
 //       catch(Exception ex) {
 //           log.warn("[CIMP] Unable to validate connection: ex={}", ex.getMessage());
@@ -182,8 +184,33 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     @Override
     public void init(Config.Scope config) {
-        logger.info("[CIMP] init");
+        logger.info(CIMP_TAG + "init");
         this.ldapStoreRegistry = new LDAPIdentityStoreRegistryCimp();
+
+        //String domainsRaw = config.get("domains"); // e.g.,
+        //todo temp hardcode: FIXME! swith it to mechanizm CimpUserStorageProviderFactory.getConfigProperties();
+        String domainsRaw = "CIMPDOMAIN1:192.168.1.18,CIMPDOMAIN2:192.168.1.35";
+        domainMap = parseDomains(domainsRaw); // your own logic
+    }
+
+    private Map<String, String> parseDomains(String domainsRaw) {
+        Map<String, String> domainMap = new HashMap<>();
+
+        if (domainsRaw == null || domainsRaw.isEmpty()) {
+            logger.warn(CIMP_TAG + "config 'domains' is null or empty!");
+            return domainMap; //
+        }
+
+        String[] entries = domainsRaw.split(",");
+        for (String entry : entries) {
+            String[] keyValue = entry.split(":");
+            if (keyValue.length == 2) {
+                String domain = keyValue[0].trim();
+                String ip = keyValue[1].trim();
+                domainMap.put(domain, ip);
+            }
+        }
+        return domainMap;
     }
 
     @Override
@@ -193,12 +220,12 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     @Override
     public void onUpdate(KeycloakSession session, RealmModel realm, ComponentModel oldModel, ComponentModel newModel) {
-        logger.infof("[CIMP] onUpdate()");
+        logger.infof(CIMP_TAG + "onUpdate()");
     }
 
     @Override
     public void onCreate(KeycloakSession session, RealmModel realm, ComponentModel model) {
-        logger.infof("[CIMP] onCreate()");
+        logger.infof(CIMP_TAG + "onCreate()");
     }
 
 //    //    public SynchronizationResult sync(KeycloakSessionFactory sessionFactory, String realmId, UserStorageProviderModel model) {

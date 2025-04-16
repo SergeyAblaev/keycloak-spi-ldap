@@ -33,15 +33,21 @@ import org.keycloak.storage.ldap.mappers.*;
 import org.keycloak.storage.user.ImportedUserValidation;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
+import org.keycloak.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
 import javax.naming.directory.Attributes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import static com.scontrol.auth.provider.user.CimpUserStorageProviderFactory.domainMap;
 
 public class LDAPStorageProviderCimp implements UserStorageProvider,
         UserLookupProvider,
@@ -57,6 +63,10 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public static final String SEARCH_BASE_PREFIX = "DC=";
     public static final String SLASH = "\\";
     public static final String BACK_SLASH = "/";
+    public static final String COLON = ":";
+    public static final String CIMP_TAG = "[cimp] ";
+    private static final Logger log = LoggerFactory.getLogger(LDAPStorageProviderCimp.class);
+
 //    private static final Logger log = LoggerFactory.getLogger(LDAPStorageProviderCimp.class);
 
     private KeycloakSession ksession;
@@ -120,9 +130,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 //    }
 
     @Override
-    public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
+    public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {  //Todo here we extend CredentialInputValidator
+        logger.infof(CIMP_TAG + "isValid logon check for User: {}",user.getUsername());
+        String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session
+        String ldapHost = domainMap.get(selectedDomain); //here we get user selected ldapHost !
+        log.info("{} user selected ldapHost: {}", CIMP_TAG, ldapHost);
+
         if (!(input instanceof UserCredentialModel)) return false;
-        logger.infof("[cimp] isValid logon check for User: {}",user.getUsername());
         boolean configuredLocally = ((LegacyUserCredentialManager) user.credentialManager()).isConfiguredLocally(PasswordCredentialModel.TYPE);
         if (input.getType().equals(PasswordCredentialModel.TYPE) && !configuredLocally) {
             if (cashedCredentials.get(user.getUsername()).equals(input.getChallengeResponse())) {
@@ -182,14 +196,14 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     //Todo - try write here our JS logic connect to MS-AD!
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
-        logger.infof("[cimp] getUserById({})",id);
+        logger.infof(CIMP_TAG + "getUserById({})",id);
         StorageId sid = new StorageId(id);
         return getUserByUsername(realm, sid.getExternalId());
     }
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
-        logger.infof("[cimp] getUserByUsername({})",username);
+        logger.infof(CIMP_TAG + "getUserByUsername({})",username);
         return  getUserFromDomain(realm, username);
     }
 
@@ -198,7 +212,10 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         if (indexOf == -1) {
             indexOf = username.indexOf(BACK_SLASH);
             if (indexOf == -1) {
-                return null;
+                indexOf = username.indexOf(COLON);
+                if (indexOf == -1) {
+                    return null;
+                }
             }
         }
         String domain = username.substring(0, indexOf);
@@ -215,7 +232,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             String domainIP = getDomainIP(domain);
             attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, SEARCH_BASE_PREFIX +domain+ SEARCH_BASE_POSTFIX);
         } catch (NamingException e) {
-            logger.error("ldapConnection ERROR: "+ e.getMessage());   logger.info("[cimp] ldapConnection ERROR: "+ e.getMessage());
+            logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
         }
 
@@ -224,7 +241,14 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         Map<String, String> rs = new HashMap<>(); //Todo - remove Map
 //        String LDAPusername = attributes.get("name").toString().substring(attributes.get("name").toString().indexOf(": ") + 2);
         rs.put("username", username);
-        rs.put("email", attributes.get("mail").toString().substring(attributes.get("mail").toString().indexOf(": ")+2));
+        Attribute mailAttribute = attributes.get("mail");
+        String mail;
+        if (mailAttribute != null) {
+            mail = mailAttribute.toString();
+        } else {
+            mail = "";
+        }
+        rs.put("email", mail.substring(mail.indexOf(": ")+2));
         rs.put("firstName","");
         rs.put("lastName","");
         rs.put("birthDate","");
@@ -247,7 +271,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
                 String memberStr = memberof.next().toString();
 
                 //Roles must be setted in Realm.JSON
-                System.out.println("[cimp] have member of: " + memberStr);
+                System.out.println(CIMP_TAG + "have member of: " + memberStr);
                 if (memberStr.contains(LMOPERATOR_BO)) {
                     user.grantRole(realm.getRole(LMOPERATOR_BO));
                 }
@@ -262,7 +286,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
                 }
             }
         } catch (NamingException e) {
-            logger.error("[cimp] ldap NamingException ERROR: " + e.getMessage());
+            logger.error(CIMP_TAG + "ldap NamingException ERROR: " + e.getMessage());
             // throw new RuntimeException(e);
         }
 
@@ -272,7 +296,10 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     }
 
     private String getDomainIP(String domain) {   //(CONFIG_KEY_IP_ADDRESS);
-        //FIXMe need add gets domainIP from properties Map! OR config Map in factory!!
+//        String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session
+//        String ldapHost = domainMap.get(selectedDomain);
+
+        //FIXMe need add gets domainIP from properties Map! OR config Map in factory!! Here we need read config IP's ?
         List<ProviderConfigProperty> configProperties = factory.getConfigProperties();
         ProviderConfigProperty configProperty = null;
         for (ProviderConfigProperty el : configProperties) {
@@ -281,7 +308,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             }
         }
         if (configProperty == null) {
-            logger.infof("[cimp] I Can't find IP address for domain: %s", domain);
+            logger.infof( "%s I Can't find IP address for domain: %s", CIMP_TAG,domain);
             return null;
         }
         return configProperty.getDefaultValue().toString(); //Todo разберись где лежит заданное value?
@@ -353,7 +380,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public Stream<UserModel> getGroupMembersStream(RealmModel realm, GroupModel group, Integer firstResult, Integer maxResults) {
-        logger.infof("[cimp] getGroupMembersStream getUsers: realm={}", realm.getName());
+        logger.infof(CIMP_TAG + "getGroupMembersStream getUsers: realm={}", realm.getName());
         int first = firstResult == null ? 0 : firstResult;
         int max = maxResults == null ? DEFAULT_MAX_RESULTS : maxResults;
         return realm.getComponentsStream(model.getId(), LDAPStorageMapper.class.getName())
@@ -583,7 +610,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 //    }
 
     protected UserModel importUserFromLDAP(KeycloakSession session, RealmModel realm, LDAPObject ldapUser) {
-        logger.infof("[cimp] importUserFromLDAP");
+        logger.infof(CIMP_TAG + "importUserFromLDAP");
          String ldapUsername = LDAPUtils.getUsername(ldapUser, ldapIdentityStore.getConfig());
             LDAPUtils.checkUuid(ldapUser, ldapIdentityStore.getConfig());
 
