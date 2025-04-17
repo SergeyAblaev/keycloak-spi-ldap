@@ -187,7 +187,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
         logger.info(CIMP_TAG + "init");
         this.ldapStoreRegistry = new LDAPIdentityStoreRegistryCimp();
 
-        //String domainsRaw = config.get("domains"); // e.g.,
+        String domainsRaw1 = config.get("domains"); //Todo here is info from 'keycloak-server.json'
         //todo temp hardcode: FIXME! swith it to mechanizm CimpUserStorageProviderFactory.getConfigProperties();
         String domainsRaw = "CIMPDOMAIN1:192.168.1.18,CIMPDOMAIN2:192.168.1.35";
         domainMap = parseDomains(domainsRaw); // your own logic
@@ -205,7 +205,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
         for (String entry : entries) {
             String[] keyValue = entry.split(":");
             if (keyValue.length == 2) {
-                String domain = keyValue[0].trim();
+                String domain = keyValue[0].trim().toUpperCase();
                 String ip = keyValue[1].trim();
                 domainMap.put(domain, ip);
             }

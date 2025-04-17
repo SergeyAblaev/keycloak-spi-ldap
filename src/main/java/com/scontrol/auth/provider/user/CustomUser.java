@@ -36,6 +36,10 @@ class CustomUser extends AbstractUserAdapter {
         
     }
 
+    public String getSessionStr() {
+        return session.toString();
+    }
+
     @Override
     public String getUsername() {
         return username;

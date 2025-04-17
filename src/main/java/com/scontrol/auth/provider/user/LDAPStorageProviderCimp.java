@@ -33,7 +33,6 @@ import org.keycloak.storage.ldap.mappers.*;
 import org.keycloak.storage.user.ImportedUserValidation;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
-import org.keycloak.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,8 +132,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {  //Todo here we extend CredentialInputValidator
         logger.infof(CIMP_TAG + "isValid logon check for User: {}",user.getUsername());
         String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session
-        String ldapHost = domainMap.get(selectedDomain); //here we get user selected ldapHost !
-        log.info("{} user selected ldapHost: {}", CIMP_TAG, ldapHost);
+        log.info("{} FRONT Selected domain: {}", CIMP_TAG, selectedDomain);
+        if (selectedDomain == null) {
+            log.info("{} FRONT Selected domain is null", CIMP_TAG);
+        } else {
+            String ldapHost = domainMap.get(selectedDomain.toUpperCase()); //here we get user selected ldapHost !
+            log.info("{} FRONT user selected ldapHost: {}", CIMP_TAG, ldapHost);
+        }
 
         if (!(input instanceof UserCredentialModel)) return false;
         boolean configuredLocally = ((LegacyUserCredentialManager) user.credentialManager()).isConfiguredLocally(PasswordCredentialModel.TYPE);
@@ -193,20 +197,35 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         logger.infof("[Cimp] close() - here NO need to clean stored password!");
     }
 
-    //Todo - try write here our JS logic connect to MS-AD!
+
     @Override
-    public UserModel getUserById(RealmModel realm, String id) {
-        logger.infof(CIMP_TAG + "getUserById({})",id);
+    public UserModel getUserById(RealmModel realm, String id) { //id=f:c71d2c9f-e512-48e6-87d1-94ddb94f3d65:cimpdomain1/user3   realm=58141f7b-32fb-4069-a165-c3f33f30560d@618f355d
+        logger.infof(CIMP_TAG + "getUserById {}",id);
         StorageId sid = new StorageId(id);
-        return getUserByUsername(realm, sid.getExternalId());
+        String externalId = sid.getExternalId();
+        if (cashedUserModels.containsKey(externalId)) {
+            UserModel userModel = cashedUserModels.get(externalId);
+            if (userModel.getId().equals(id)) {
+                String sessionStr = ((CustomUser) userModel).getSessionStr();
+                log.info("cashedUserModels.put ksession: "+ ksession.toString() +" vs "+ sessionStr);
+                //Inside of userModel have KeycloakSession! If diff - trow except from infinispan cashe "Cannot access delegate without a transaction"!
+                //FixMe - for awoid TWICE query to LDAP, TRY create builder for new userModel object for copy all field except session!!
+                if (ksession.toString().equals(sessionStr)) {
+                    return userModel;
+                }
+            }
+        }
+        //if we don't get from cash - get a new query to LDAP
+        logger.infof(CIMP_TAG + "get a new query to LDAP for Id: {}",id);
+        return getUserByUsername(realm, externalId);
     }
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
-        logger.infof(CIMP_TAG + "getUserByUsername({})",username);
+        logger.infof(CIMP_TAG + "getUserByUsername({})",username); // cimpdomain1/user3
         return  getUserFromDomain(realm, username);
     }
-
+    //Todo - try write here our JS logic connect to MS-AD!
     private CustomUser getUserFromDomain(RealmModel realm, String username) {
         int indexOf = username.indexOf(SLASH);
         if (indexOf == -1) {
@@ -221,21 +240,26 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         String domain = username.substring(0, indexOf);
         String username_without_domain = username.substring(indexOf + 1);
 
-        Attributes attributes;
+        MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
 
-        String password = getPasswordFromSession();
+        String password = getValue(decodedFormParameters, PasswordCredentialModel.TYPE);
         if (password == null ) { //try to check cashed credentials
             password = cashedCredentials.get(username);
         }
+
+        String formDomain = getValue(decodedFormParameters, "domain");
+        log.info("{} FORM domain: {}", CIMP_TAG, formDomain);
+
+        Attributes attributes;
         try {
         //FIXMe need add gets domainIP from properties Map! OR config Map in factory!!
-            String domainIP = getDomainIP(domain);
+       //     String domainIP = getDomainIP(domain); //FixMe NOT work get from congig!!!
+            String domainIP = domainMap.get(domain.toUpperCase());
             attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, SEARCH_BASE_PREFIX +domain+ SEARCH_BASE_POSTFIX);
         } catch (NamingException e) {
             logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
         }
-
         logger.info("found user, attributes: "+ attributes);
 
         Map<String, String> rs = new HashMap<>(); //Todo - remove Map
@@ -289,15 +313,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             logger.error(CIMP_TAG + "ldap NamingException ERROR: " + e.getMessage());
             // throw new RuntimeException(e);
         }
-
+        log.info("cashedUserModels.put ksession: "+ ksession.toString());
         cashedUserModels.put(username, user);
 
         return user;
     }
 
     private String getDomainIP(String domain) {   //(CONFIG_KEY_IP_ADDRESS);
-//        String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session
-//        String ldapHost = domainMap.get(selectedDomain);
 
         //FIXMe need add gets domainIP from properties Map! OR config Map in factory!! Here we need read config IP's ?
         List<ProviderConfigProperty> configProperties = factory.getConfigProperties();
@@ -314,14 +336,22 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         return configProperty.getDefaultValue().toString(); //Todo разберись где лежит заданное value?
     }
 
-    private String getPasswordFromSession() {
-        String password = null;
-        MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
-        List<String> strings = decodedFormParameters.get(PasswordCredentialModel.TYPE);
+//    private String getFormPassword(MultivaluedMap<String, String> decodedFormParameters) {
+//        return getValue(decodedFormParameters, PasswordCredentialModel.TYPE);
+//    }
+
+//    private String getFormDomain(MultivaluedMap<String, String> decodedFormParameters) {
+//        String key = "domain";//Here is form result!!  decodedFormParameters.get("domain"); // value = DOMAIN1
+//        return getValue(decodedFormParameters, "domain");
+//    }
+
+    private static String getValue(MultivaluedMap<String, String> decodedFormParameters, String key) {
+        String value = null;
+        List<String> strings = decodedFormParameters.get(key);
         if (strings != null && !strings.isEmpty()){
-            password = strings.get(0);
+            value = strings.get(0);
         }
-        return password;
+        return value;
     }
 
     protected LDAPObject queryByEmail(RealmModel realm, String email) {
@@ -672,6 +702,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public UserModel validate(RealmModel realm, UserModel local) {
+        log.info("{} validate function", CIMP_TAG);
         LDAPObject ldapObject = loadAndValidateUser(realm, local);
         if (ldapObject == null) {
             return null;
@@ -699,7 +730,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
         UserModel proxied = local;
 
-        checkDNChanged(realm, local, ldapObject);
+        checkDNChanged(realm, local, ldapObject); //Todo - thats wis is work? Is this for write into domain?!
 
 //        switch (editMode) {
 //            case READ_ONLY:
