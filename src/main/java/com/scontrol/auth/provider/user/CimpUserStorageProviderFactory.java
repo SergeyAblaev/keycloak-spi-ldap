@@ -17,6 +17,7 @@ import org.jboss.logging.Logger;
 import org.keycloak.storage.ldap.mappers.LDAPStorageMapper;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,13 +27,12 @@ import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.*
 public class CimpUserStorageProviderFactory implements UserStorageProviderFactory<LDAPStorageProviderCimp>
         //UserStorageProviderFactory<LDAPStorageProvider> , ImportSynchronization
 {
-    //    private static final Logger log = LoggerFactory.getLogger(CimpUserStorageProviderFactory.class);
 
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderFactory.class);
     public static final String CIMP_TAG = "[CIMP] ";
     protected final List<ProviderConfigProperty> configProperties;
     private LDAPIdentityStoreRegistryCimp ldapStoreRegistry;
-    public static Map<String, String> domainMap;
+    public static Map<String, Map<String, String>> domainsMap = new ConcurrentHashMap<>();
 
     public CimpUserStorageProviderFactory() {
         logger.infof(CIMP_TAG + "cimp. CustomUserStorageProviderFactory created");
@@ -42,7 +42,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .property().name(CONFIG_KEY_DOMAINNAME)
                 .label("Domain name")
                 .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("-")
+                .defaultValue("cimpdomain1")
                 .helpText("Example: myDomain1")
                 .add()
                 .property().name(CONFIG_KEY_IP_ADDRESS)
@@ -55,10 +55,10 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .label("Port").type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("389")
                 .helpText("Example: 389")
-                .add()
-                .property().name(LDAPConstants.CONNECTION_URL).label("Connection URL")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("ldap://192.168.1.18:389")
+//                .add()
+//                .property().name(LDAPConstants.CONNECTION_URL).label("Connection URL")
+//                .type(ProviderConfigProperty.STRING_TYPE)
+//                .defaultValue("ldap://192.168.1.18:389")
                 .add()
                 .property().name(LDAPConstants.USERNAME_LDAP_ATTRIBUTE).label("Username LDAP attribute")
                 .type(ProviderConfigProperty.STRING_TYPE)
@@ -76,6 +76,10 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("person, organizationalPerson, user")
                 .add()
+                .property().name(LDAPConstants.BASE_DN).label("Base DN")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue("DC=cimpdomain1,DC=com")
+                .add()
                 .property().name(LDAPConstants.USERS_DN).label("Users DN")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("CN=Users, DC=domain1, DC=com")
@@ -86,14 +90,14 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .property().name(LDAPConstants.AUTH_TYPE).label("Bind type")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("simple")
-                .add()
-                .property().name(LDAPConstants.BIND_DN).label("Bind DN")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("CN=Administrator,CN=Users, DC=cimpdomain1, DC=com")
-                .add()
-                .property().name(LDAPConstants.BIND_CREDENTIAL).label("Bind credentials")
-                .type(ProviderConfigProperty.PASSWORD).defaultValue("123")
-                .secret(true)
+//                .add()
+//                .property().name(LDAPConstants.BIND_DN).label("Bind DN")
+//                .type(ProviderConfigProperty.STRING_TYPE)
+//                .defaultValue("CN=Administrator,CN=Users, DC=cimpdomain1, DC=com")
+//                .add()
+//                .property().name(LDAPConstants.BIND_CREDENTIAL).label("Bind credentials")
+//                .type(ProviderConfigProperty.PASSWORD).defaultValue("123")
+//                .secret(true)
 
 //          .property()
 //            .name(CONFIG_KEY_JDBC_DRIVER)
@@ -136,7 +140,27 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
         Map<ComponentModel, LDAPConfigDecorator> configDecorators = getLDAPConfigDecorators(session, model);
         LDAPIdentityStoreCimp ldapIdentityStore = this.ldapStoreRegistry.getLdapStore(session, model, configDecorators);
+//        String domainList = model.getConfig().getFirst("domains"); // Key = "domains"
+//        fillConfigIntoDomainsMap(model);
         return new LDAPStorageProviderCimp(this, session, model, ldapIdentityStore);
+    }
+
+    private static void fillConfigIntoDomainsMap(ComponentModel model) {
+        String domainname = model.getConfig().getFirst(CONFIG_KEY_DOMAINNAME);
+        logger.info(CIMP_TAG + "fillConfigIntoDomainsMap for " + domainname);
+
+         Map<String, String> domainMap = new HashMap<>();
+        if (domainname != null) {
+            domainMap.put(CONFIG_KEY_DOMAINNAME, domainname);
+            domainMap.put(CONFIG_KEY_IP_ADDRESS, model.getConfig().getFirst(CONFIG_KEY_IP_ADDRESS));
+            domainMap.put(CONFIG_KEY_PORT, model.getConfig().getFirst(CONFIG_KEY_PORT));
+            domainMap.put(CONFIG_KEY_VALIDATION_QUERY, model.getConfig().getFirst(CONFIG_KEY_VALIDATION_QUERY));
+            domainMap.put(LDAPConstants.BASE_DN, model.getConfig().getFirst(LDAPConstants.BASE_DN));
+            domainMap.put(LDAPConstants.USER_OBJECT_CLASSES, model.getConfig().getFirst(LDAPConstants.USER_OBJECT_CLASSES));
+            domainMap.put(LDAPConstants.RDN_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE));
+            domainMap.put(LDAPConstants.UUID_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE));
+            domainsMap.put(domainname.toUpperCase(),domainMap);
+        }
     }
 
     protected Map<ComponentModel, LDAPConfigDecorator> getLDAPConfigDecorators(KeycloakSession session, ComponentModel ldapModel) {
@@ -187,30 +211,8 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
         logger.info(CIMP_TAG + "init");
         this.ldapStoreRegistry = new LDAPIdentityStoreRegistryCimp();
 
-        String domainsRaw1 = config.get("domains"); //Todo here is info from 'keycloak-server.json'
-        //todo temp hardcode: FIXME! swith it to mechanizm CimpUserStorageProviderFactory.getConfigProperties();
-        String domainsRaw = "CIMPDOMAIN1:192.168.1.18,CIMPDOMAIN2:192.168.1.35";
-        domainMap = parseDomains(domainsRaw); // your own logic
-    }
-
-    private Map<String, String> parseDomains(String domainsRaw) {
-        Map<String, String> domainMap = new HashMap<>();
-
-        if (domainsRaw == null || domainsRaw.isEmpty()) {
-            logger.warn(CIMP_TAG + "config 'domains' is null or empty!");
-            return domainMap; //
-        }
-
-        String[] entries = domainsRaw.split(",");
-        for (String entry : entries) {
-            String[] keyValue = entry.split(":");
-            if (keyValue.length == 2) {
-                String domain = keyValue[0].trim().toUpperCase();
-                String ip = keyValue[1].trim();
-                domainMap.put(domain, ip);
-            }
-        }
-        return domainMap;
+//        String domainsRaw1 = config.get("domains"); //Todo here is info from 'keycloak-server.json'
+        //todo temp hardcode: FIXME! swith it to mechanizm CimpUserStorageProviderFactory.getConfigProperties();!
     }
 
     @Override
@@ -220,12 +222,17 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     @Override
     public void onUpdate(KeycloakSession session, RealmModel realm, ComponentModel oldModel, ComponentModel newModel) {
-        logger.infof(CIMP_TAG + "onUpdate()");
+        String oldDomainname = oldModel.getConfig().getFirst(CONFIG_KEY_DOMAINNAME);
+        domainsMap.remove(oldDomainname);
+        logger.infof(CIMP_TAG + "onUpdate(), remove "+oldDomainname);
+
+        fillConfigIntoDomainsMap(newModel);
     }
 
     @Override
     public void onCreate(KeycloakSession session, RealmModel realm, ComponentModel model) {
         logger.infof(CIMP_TAG + "onCreate()");
+        fillConfigIntoDomainsMap(model);
     }
 
 //    //    public SynchronizationResult sync(KeycloakSessionFactory sessionFactory, String realmId, UserStorageProviderModel model) {

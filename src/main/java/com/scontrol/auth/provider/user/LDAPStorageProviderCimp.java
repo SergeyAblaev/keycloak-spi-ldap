@@ -46,7 +46,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static com.scontrol.auth.provider.user.CimpUserStorageProviderFactory.domainMap;
+import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.CONFIG_KEY_DOMAINNAME;
+import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.CONFIG_KEY_IP_ADDRESS;
+import static com.scontrol.auth.provider.user.CimpUserStorageProviderFactory.domainsMap;
 
 public class LDAPStorageProviderCimp implements UserStorageProvider,
         UserLookupProvider,
@@ -130,15 +132,15 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {  //Todo here we extend CredentialInputValidator
-        logger.infof(CIMP_TAG + "isValid logon check for User: {}",user.getUsername());
-        String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session
-        log.info("{} FRONT Selected domain: {}", CIMP_TAG, selectedDomain);
-        if (selectedDomain == null) {
-            log.info("{} FRONT Selected domain is null", CIMP_TAG);
-        } else {
-            String ldapHost = domainMap.get(selectedDomain.toUpperCase()); //here we get user selected ldapHost !
-            log.info("{} FRONT user selected ldapHost: {}", CIMP_TAG, ldapHost);
-        }
+        logger.info(CIMP_TAG + "isValid logon check for User: "+ user.getUsername());
+//  Wrong code!      String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session //righ vers: getValue(decodedFormParameters, "domain");
+//        log.info("{} FRONT Selected domain: {}", CIMP_TAG, selectedDomain);
+//        if (selectedDomain == null) {
+//            log.info("{} FRONT Selected domain is null", CIMP_TAG);
+//        } else {
+//            String ldapHost = domainMap.get(selectedDomain.toUpperCase()); //here we get user selected ldapHost !
+//            log.info("{} FRONT user selected ldapHost: {}", CIMP_TAG, ldapHost);
+//        }
 
         if (!(input instanceof UserCredentialModel)) return false;
         boolean configuredLocally = ((LegacyUserCredentialManager) user.credentialManager()).isConfiguredLocally(PasswordCredentialModel.TYPE);
@@ -207,7 +209,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             UserModel userModel = cashedUserModels.get(externalId);
             if (userModel.getId().equals(id)) {
                 String sessionStr = ((CustomUser) userModel).getSessionStr();
-                log.info("cashedUserModels.put ksession: "+ ksession.toString() +" vs "+ sessionStr);
+                log.info("cashedUserModels.get ksession: "+ ksession.toString() +" vs "+ sessionStr);
                 //Inside of userModel have KeycloakSession! If diff - trow except from infinispan cashe "Cannot access delegate without a transaction"!
                 //FixMe - for awoid TWICE query to LDAP, TRY create builder for new userModel object for copy all field except session!!
                 if (ksession.toString().equals(sessionStr)) {
@@ -221,41 +223,58 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     }
 
     @Override
-    public UserModel getUserByUsername(RealmModel realm, String username) {
+    public UserModel getUserByUsername(RealmModel realm, String username) { //here 1st calling after UI form
         logger.infof(CIMP_TAG + "getUserByUsername({})",username); // cimpdomain1/user3
         return  getUserFromDomain(realm, username);
     }
     //Todo - try write here our JS logic connect to MS-AD!
     private CustomUser getUserFromDomain(RealmModel realm, String username) {
-        int indexOf = username.indexOf(SLASH);
-        if (indexOf == -1) {
-            indexOf = username.indexOf(BACK_SLASH);
+        //Hi priority for selected domain name, oppposite the writed into username!
+        MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
+        String domain = getValue(decodedFormParameters, "domain");
+        log.info("{} FORM domain: {}", CIMP_TAG, domain);
+
+        String username_without_domain;
+
+        if (domain == null) {
+            //try to check domain in username
+            int indexOf = username.indexOf(SLASH);
             if (indexOf == -1) {
-                indexOf = username.indexOf(COLON);
+                indexOf = username.indexOf(BACK_SLASH);
                 if (indexOf == -1) {
-                    return null;
+                    indexOf = username.indexOf(COLON);
+                    if (indexOf == -1) {
+                        return null;
+                    }
                 }
             }
+            domain = username.substring(0, indexOf);
+            username_without_domain = username.substring(indexOf + 1);
+        } else {
+            //try to add domain into username
+            username_without_domain = username;
+            username = domain.concat(":" + username_without_domain);
         }
-        String domain = username.substring(0, indexOf);
-        String username_without_domain = username.substring(indexOf + 1);
 
-        MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
 
         String password = getValue(decodedFormParameters, PasswordCredentialModel.TYPE);
         if (password == null ) { //try to check cashed credentials
             password = cashedCredentials.get(username);
         }
 
-        String formDomain = getValue(decodedFormParameters, "domain");
-        log.info("{} FORM domain: {}", CIMP_TAG, formDomain);
-
         Attributes attributes;
         try {
-        //FIXMe need add gets domainIP from properties Map! OR config Map in factory!!
-       //     String domainIP = getDomainIP(domain); //FixMe NOT work get from congig!!!
-            String domainIP = domainMap.get(domain.toUpperCase());
-            attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, SEARCH_BASE_PREFIX +domain+ SEARCH_BASE_POSTFIX);
+
+            Map<String, String> domainMap = domainsMap.get(domain);
+            if (domainMap == null) {
+                return null;
+            }
+            String domainIP = domainMap.get(CONFIG_KEY_IP_ADDRESS);
+            String searchBase = domainMap.get(LDAPConstants.BASE_DN);
+            //FixMe - here is we can use other params from
+//            String searchBase = SEARCH_BASE_PREFIX + domain + SEARCH_BASE_POSTFIX;("DC=domain1,DC=com")
+
+            attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase);
         } catch (NamingException e) {
             logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
@@ -263,7 +282,6 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         logger.info("found user, attributes: "+ attributes);
 
         Map<String, String> rs = new HashMap<>(); //Todo - remove Map
-//        String LDAPusername = attributes.get("name").toString().substring(attributes.get("name").toString().indexOf(": ") + 2);
         rs.put("username", username);
         Attribute mailAttribute = attributes.get("mail");
         String mail;
@@ -289,25 +307,30 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
                 .build();
 
         try {
-            NamingEnumeration<?> memberof = attributes.get("memberof").getAll();
+            Attribute memberofAttr = attributes.get("memberof");
+            if (memberofAttr != null) {
+                log.info(CIMP_TAG + "found memberof, attributes: " + memberofAttr); //for DOMAIN2 not found ANY!: memberof=memberOf: CN=LMOperatorBO,CN=Users,DC=cimpdomain1,DC=com, CN=Allowed RODC Password Replication Group,CN=Users,DC=cimpdomain1,DC=com
+                NamingEnumeration<?> memberof = memberofAttr.getAll();
+                while (memberof.hasMore()) {
+                    String memberStr = memberof.next().toString();
 
-            while (memberof.hasMore()) {
-                String memberStr = memberof.next().toString();
-
-                //Roles must be setted in Realm.JSON
-                System.out.println(CIMP_TAG + "have member of: " + memberStr);
-                if (memberStr.contains(LMOPERATOR_BO)) {
-                    user.grantRole(realm.getRole(LMOPERATOR_BO));
+                    //Roles must be setted in Realm.JSON
+                    System.out.println(CIMP_TAG + "have member of: " + memberStr);
+                    if (memberStr.contains(LMOPERATOR_BO)) {
+                        user.grantRole(realm.getRole(LMOPERATOR_BO));
+                    }
+                    if (memberStr.contains(LMVIEWER_BO)) {
+                        user.grantRole(realm.getRole(LMVIEWER_BO));
+                    }
+                    if (memberStr.contains(LMVIEWER_MKTG)) {
+                        user.grantRole(realm.getRole(LMVIEWER_MKTG));
+                    }
+                    if (memberStr.contains(LMOPERATOR_MKTG)) {
+                        user.grantRole(realm.getRole(LMOPERATOR_MKTG));
+                    }
                 }
-                if (memberStr.contains(LMVIEWER_BO)) {
-                    user.grantRole(realm.getRole(LMVIEWER_BO));
-                }
-                if (memberStr.contains(LMVIEWER_MKTG)) {
-                    user.grantRole(realm.getRole(LMVIEWER_MKTG));
-                }
-                if (memberStr.contains(LMOPERATOR_MKTG)) {
-                    user.grantRole(realm.getRole(LMOPERATOR_MKTG));
-                }
+            } else {
+                log.info(CIMP_TAG + "not found ANY! memberof!"); //for DOMAIN2 not found ANY!: memberof=memberOf:
             }
         } catch (NamingException e) {
             logger.error(CIMP_TAG + "ldap NamingException ERROR: " + e.getMessage());
@@ -319,22 +342,6 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         return user;
     }
 
-    private String getDomainIP(String domain) {   //(CONFIG_KEY_IP_ADDRESS);
-
-        //FIXMe need add gets domainIP from properties Map! OR config Map in factory!! Here we need read config IP's ?
-        List<ProviderConfigProperty> configProperties = factory.getConfigProperties();
-        ProviderConfigProperty configProperty = null;
-        for (ProviderConfigProperty el : configProperties) {
-            if (el.getName().equals("ipAddress")) {
-                configProperty = el;
-            }
-        }
-        if (configProperty == null) {
-            logger.infof( "%s I Can't find IP address for domain: %s", CIMP_TAG,domain);
-            return null;
-        }
-        return configProperty.getDefaultValue().toString(); //Todo разберись где лежит заданное value?
-    }
 
 //    private String getFormPassword(MultivaluedMap<String, String> decodedFormParameters) {
 //        return getValue(decodedFormParameters, PasswordCredentialModel.TYPE);
