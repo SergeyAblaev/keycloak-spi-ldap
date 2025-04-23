@@ -30,12 +30,13 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderFactory.class);
     public static final String CIMP_TAG = "[CIMP] ";
+    public static final String CIMP_USER_PROVIDER = "cimp-user-provider";
     protected final List<ProviderConfigProperty> configProperties;
     private LDAPIdentityStoreRegistryCimp ldapStoreRegistry;
     public static Map<String, Map<String, String>> domainsMap = new ConcurrentHashMap<>();
 
     public CimpUserStorageProviderFactory() {
-        logger.infof(CIMP_TAG + "cimp. CustomUserStorageProviderFactory created");
+        logger.infof(CIMP_TAG + "cimp. CimpUserStorageProviderFactory created");
 
         // Create config metadata  dn "CN=Users, DC=cimpdomain1, DC=com"
         configProperties = ProviderConfigurationBuilder.create()
@@ -179,7 +180,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     @Override
     public String getId() {
         logger.info(CIMP_TAG + "cimp. getId()");
-        return "cimp-user-provider";
+        return CIMP_USER_PROVIDER;
     }
 
 

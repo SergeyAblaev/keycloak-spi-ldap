@@ -236,7 +236,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
         String username_without_domain;
 
-        if (domain == null) {
+        if (domain == null || domain.equals("null")) {
             //try to check domain in username
             int indexOf = username.indexOf(SLASH);
             if (indexOf == -1) {
@@ -265,7 +265,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         Attributes attributes;
         try {
 
-            Map<String, String> domainMap = domainsMap.get(domain);
+            Map<String, String> domainMap = domainsMap.get(domain.toUpperCase());
             if (domainMap == null) {
                 return null;
             }
@@ -376,7 +376,15 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public UserModel getUserByEmail(RealmModel realm, String email) {
-        logger.infof("[I48] getUserByEmail({})",email);
+        logger.infof("{} getUserByEmail({})", CIMP_TAG, email);
+        //check domain
+        MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
+        String domain = getValue(decodedFormParameters, "domain");
+        if (domain == null) {
+            return null;
+        }
+        log.info("{} FORM domain: {}", CIMP_TAG, domain);
+
         LDAPObject ldapUser = queryByEmail(realm, email);
         if (ldapUser == null) {
             return null;
