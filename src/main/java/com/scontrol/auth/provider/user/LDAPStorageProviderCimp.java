@@ -8,6 +8,7 @@ import com.scontrol.auth.provider.ldap.store.LdapConnectionUtils;
 import com.scontrol.auth.provider.mapper.CimpStorageMapperManager;
 import com.scontrol.auth.provider.mapper.LDAPStorageMapperCimp;
 import jakarta.ws.rs.core.MultivaluedMap;
+import org.jboss.logging.Logger;
 import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.*;
@@ -33,8 +34,8 @@ import org.keycloak.storage.ldap.mappers.*;
 import org.keycloak.storage.user.ImportedUserValidation;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -56,7 +57,6 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         UserQueryProvider,
         ImportedUserValidation {
     public static final String SEARCH_BASE_POSTFIX = ",DC=com";
-    private static final org.jboss.logging.Logger logger = org.jboss.logging.Logger.getLogger(LDAPStorageProvider.class);
     public static final String LMOPERATOR_BO = "LMOperatorBO";
     public static final String LMVIEWER_BO = "LMViewerBO";
     public static final String LMOPERATOR_MKTG = "LMOperatorMktg";
@@ -66,7 +66,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public static final String BACK_SLASH = "/";
     public static final String COLON = ":";
     public static final String CIMP_TAG = "[cimp] ";
-    private static final Logger log = LoggerFactory.getLogger(LDAPStorageProviderCimp.class);
+    private static final Logger logger = Logger.getLogger(LDAPStorageProviderCimp.class);
 
 //    private static final Logger log = LoggerFactory.getLogger(LDAPStorageProviderCimp.class);
 
@@ -134,12 +134,12 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {  //Todo here we extend CredentialInputValidator
         logger.info(CIMP_TAG + "isValid logon check for User: "+ user.getUsername());
 //  Wrong code!      String selectedDomain = user.getFirstAttribute("selected_domain"); // or from session //righ vers: getValue(decodedFormParameters, "domain");
-//        log.info("{} FRONT Selected domain: {}", CIMP_TAG, selectedDomain);
+//        logger.infof("{} FRONT Selected domain: {}", CIMP_TAG, selectedDomain);
 //        if (selectedDomain == null) {
-//            log.info("{} FRONT Selected domain is null", CIMP_TAG);
+//            logger.infof("{} FRONT Selected domain is null", CIMP_TAG);
 //        } else {
 //            String ldapHost = domainMap.get(selectedDomain.toUpperCase()); //here we get user selected ldapHost !
-//            log.info("{} FRONT user selected ldapHost: {}", CIMP_TAG, ldapHost);
+//            logger.infof("{} FRONT user selected ldapHost: {}", CIMP_TAG, ldapHost);
 //        }
 
         if (!(input instanceof UserCredentialModel)) return false;
@@ -209,7 +209,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             UserModel userModel = cashedUserModels.get(externalId);
             if (userModel.getId().equals(id)) {
                 String sessionStr = ((CustomUser) userModel).getSessionStr();
-                log.info("cashedUserModels.get ksession: "+ ksession.toString() +" vs "+ sessionStr);
+                logger.infof("cashedUserModels.get ksession: "+ ksession.toString() +" vs "+ sessionStr);
                 //Inside of userModel have KeycloakSession! If diff - trow except from infinispan cashe "Cannot access delegate without a transaction"!
                 //FixMe - for awoid TWICE query to LDAP, TRY create builder for new userModel object for copy all field except session!!
                 if (ksession.toString().equals(sessionStr)) {
@@ -232,7 +232,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         //Hi priority for selected domain name, oppposite the writed into username!
         MultivaluedMap<String, String> decodedFormParameters = ksession.getContext().getHttpRequest().getDecodedFormParameters();
         String domain = getValue(decodedFormParameters, "domain");
-        log.info("{} FORM domain: {}", CIMP_TAG, domain);
+        logger.infof("{} FORM domain: {}", CIMP_TAG, domain);
 
         String username_without_domain;
 
@@ -309,7 +309,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         try {
             Attribute memberofAttr = attributes.get("memberof");
             if (memberofAttr != null) {
-                log.info(CIMP_TAG + "found memberof, attributes: " + memberofAttr); //for DOMAIN2 not found ANY!: memberof=memberOf: CN=LMOperatorBO,CN=Users,DC=cimpdomain1,DC=com, CN=Allowed RODC Password Replication Group,CN=Users,DC=cimpdomain1,DC=com
+                logger.infof(CIMP_TAG + "found memberof, attributes: " + memberofAttr); //for DOMAIN2 not found ANY!: memberof=memberOf: CN=LMOperatorBO,CN=Users,DC=cimpdomain1,DC=com, CN=Allowed RODC Password Replication Group,CN=Users,DC=cimpdomain1,DC=com
                 NamingEnumeration<?> memberof = memberofAttr.getAll();
                 while (memberof.hasMore()) {
                     String memberStr = memberof.next().toString();
@@ -330,13 +330,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
                     }
                 }
             } else {
-                log.info(CIMP_TAG + "not found ANY! memberof!"); //for DOMAIN2 not found ANY!: memberof=memberOf:
+                logger.infof(CIMP_TAG + "not found ANY! memberof!"); //for DOMAIN2 not found ANY!: memberof=memberOf:
             }
         } catch (NamingException e) {
             logger.error(CIMP_TAG + "ldap NamingException ERROR: " + e.getMessage());
             // throw new RuntimeException(e);
         }
-        log.info("cashedUserModels.put ksession: "+ ksession.toString());
+        logger.infof("cashedUserModels.put ksession: "+ ksession.toString());
         cashedUserModels.put(username, user);
 
         return user;
@@ -383,7 +383,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         if (domain == null) {
             return null;
         }
-        log.info("{} FORM domain: {}", CIMP_TAG, domain);
+        logger.infof("{} FORM domain: {}", CIMP_TAG, domain);
 
         LDAPObject ldapUser = queryByEmail(realm, email);
         if (ldapUser == null) {
@@ -717,7 +717,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public UserModel validate(RealmModel realm, UserModel local) {
-        log.info("{} validate function", CIMP_TAG);
+        logger.infof("{} validate function", CIMP_TAG);
         LDAPObject ldapObject = loadAndValidateUser(realm, local);
         if (ldapObject == null) {
             return null;
