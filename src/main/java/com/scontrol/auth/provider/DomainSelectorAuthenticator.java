@@ -19,43 +19,26 @@ import java.util.Set;
 public class DomainSelectorAuthenticator implements Authenticator {
     @Override
     public void authenticate(AuthenticationFlowContext context) {
-//        ComponentModel userStorage = findYourComponentModel(context);
-//        String rawDomainList = userStorage.getConfig().getFirst("domains");
-//        Map<String, String> domainMap = parseDomainList(rawDomainList);
 
+        // Just inject the domain list into the context
+        Map<String, String> domainMap = getDomainMap();
+        context.form().setAttribute("domainMap", domainMap);
+
+//        Response challenge = context.form().createLoginUsernamePassword(); // uses login.ftl
+//        context.challenge(challenge);
+
+        // Do not render anything — just move on
+        context.success();
+    }
+
+    private static Map<String, String> getDomainMap() {
         Set<String> domainSet = CimpUserStorageProviderFactory.domainsMap.keySet();
         Map<String, String> domainMap = new HashMap<>();
         for (String domain : domainSet) {
             domainMap.put(domain, domain);
         }
-
-        context.form().setAttribute("domainMap", domainMap);
-
-        Response challenge = context.form()
-                .createLoginUsernamePassword(); // uses login.ftl
-        context.challenge(challenge);
+        return domainMap;
     }
-
-//    private ComponentModel findYourComponentModel(AuthenticationFlowContext context) {
-////        return context.getSession().getComponentProvider(LDAPStorageProviderCimp.class,"your-provider-id").getModel();
-//        return context.getSession().getComponentProvider(LDAPStorageProviderCimp.class,CimpUserStorageProviderFactory.CIMP_USER_PROVIDER).getModel();
-////                .getRealm().
-////                .getUserStorageProvidersStream()
-////                .filter(m -> "your-provider-id".equals(m.getProviderId()))
-////                .findFirst()
-////                .orElse(null);
-//    }
-
-//    private Map<String, String> parseDomainList(String raw) {
-//        Map<String, String> map = new HashMap<>();
-//        if (raw != null) {
-//            for (String entry : raw.split(",")) {
-//                String[] parts = entry.split(":");
-//                if (parts.length == 2) map.put(parts[0], parts[1]);
-//            }
-//        }
-//        return map;
-//    }
 
     @Override public void action(AuthenticationFlowContext context) { context.success(); }
     @Override public boolean requiresUser() { return false; }
