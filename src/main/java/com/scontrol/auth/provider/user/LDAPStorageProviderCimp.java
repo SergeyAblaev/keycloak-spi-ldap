@@ -67,9 +67,6 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public static final String COLON = ":";
     public static final String CIMP_TAG = "[cimp] ";
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderCimp.class);
-
-//    private static final Logger log = LoggerFactory.getLogger(LDAPStorageProviderCimp.class);
-
     private KeycloakSession ksession;
     //    private ComponentModel model;   //Todo Origin LDAP is:  UserStorageProviderModel model;
     private CimpUserStorageProviderModel model;
@@ -83,11 +80,11 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     private LDAPMappersComparator ldapMappersComparator;
     private final static ConcurrentHashMap<String, String> cashedCredentials = new ConcurrentHashMap<>();
     private final static ConcurrentHashMap<String, UserModel> cashedUserModels = new ConcurrentHashMap<>();
-
+    private final String domainName;
     protected final Set<String> supportedCredentialTypes = new HashSet<>();
     private static final int DEFAULT_MAX_RESULTS = Integer.MAX_VALUE >> 1;
 
-    public LDAPStorageProviderCimp(CimpUserStorageProviderFactory factory, KeycloakSession session, ComponentModel model, LDAPIdentityStoreCimp ldapIdentityStore) {
+    public LDAPStorageProviderCimp(CimpUserStorageProviderFactory factory, KeycloakSession session, ComponentModel model, LDAPIdentityStoreCimp ldapIdentityStore, String domainName) {
         logger.infof("[CustomUserStorageProvider] class loaded!");
         this.factory = factory;
         this.ksession = session;
@@ -97,6 +94,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         this.mapperManager = new CimpStorageMapperManager(this);
         this.userManager = new CimpStorageUserManager(this);
         supportedCredentialTypes.add(PasswordCredentialModel.TYPE);
+        this.domainName=domainName;
 //        this.kerberosConfig = new LDAPProviderKerberosConfig(model);
 //        if (kerberosConfig.isAllowKerberosAuthentication()) {
 //            supportedCredentialTypes.add(UserCredentialModel.KERBEROS);
@@ -475,7 +473,8 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
 
     @Override
     public Stream<UserModel> searchForUserStream(RealmModel realm, Map<String, String> params, Integer firstResult, Integer maxResults) {
-        return cashedUserModels.values().stream();
+        logger.infof(CIMP_TAG + "searchForUserStream getUsers: realm={}, keys={}", realm.getName(), cashedUserModels.keys());
+        return cashedUserModels.values().stream().filter(el->el.getUsername().startsWith(domainName.toUpperCase()));
 //        return getGroupMembersStream(realm, null, firstResult, maxResults);
     }
 

@@ -141,9 +141,9 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 
         Map<ComponentModel, LDAPConfigDecorator> configDecorators = getLDAPConfigDecorators(session, model);
         LDAPIdentityStoreCimp ldapIdentityStore = this.ldapStoreRegistry.getLdapStore(session, model, configDecorators);
-//        String domainList = model.getConfig().getFirst("domains"); // Key = "domains"
 //        fillConfigIntoDomainsMap(model);
-        return new LDAPStorageProviderCimp(this, session, model, ldapIdentityStore);
+        String domainname = model.getConfig().getFirst(CONFIG_KEY_DOMAINNAME);
+        return new LDAPStorageProviderCimp(this, session, model, ldapIdentityStore, domainname);
     }
 
     private static void fillConfigIntoDomainsMap(ComponentModel model) {
