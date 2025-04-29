@@ -1,5 +1,7 @@
 package com.scontrol.auth.provider.user;
 
+import com.scontrol.auth.provider.ldap.store.LdapConnectionUtils;
+import org.jboss.logging.Logger;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.LegacyUserCredentialManager;
@@ -19,6 +21,7 @@ class CustomUser extends AbstractUserAdapter {
     private final String lastName;
     private final String birthDate;
     private final Set<RoleModel> roles = new HashSet<>();
+    private static final Logger logger = Logger.getLogger(CustomUser.class);
 
     private CustomUser(KeycloakSession session, RealmModel realm,
       ComponentModel storageProviderModel,
@@ -77,7 +80,7 @@ class CustomUser extends AbstractUserAdapter {
 
     @Override
     public void grantRole(RoleModel role) {
-        System.out.println("[cimp] Granting role " + role.getName());
+        logger.info("[cimp] Granting role " + role.getName());
         roles.add(role);
     }
 

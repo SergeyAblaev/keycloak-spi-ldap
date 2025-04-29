@@ -34,11 +34,11 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     protected final List<ProviderConfigProperty> configProperties;
     private LDAPIdentityStoreRegistryCimp ldapStoreRegistry;
     public static Map<String, Map<String, String>> domainsMap = new ConcurrentHashMap<>();
+    public static final String SEARCH_FILTER_STR = "(&(cn=%s)(objectclass=person)(objectclass=organizationalPerson)(objectclass=user))";
 
     public CimpUserStorageProviderFactory() {
         logger.infof(CIMP_TAG + "cimp. CimpUserStorageProviderFactory created");
 
-        // Create config metadata  dn "CN=Users, DC=cimpdomain1, DC=com"
         configProperties = ProviderConfigurationBuilder.create()
                 .property().name(CONFIG_KEY_DOMAINNAME)
                 .label("Domain name")
@@ -79,11 +79,15 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .add()
                 .property().name(LDAPConstants.BASE_DN).label("Base DN")
                 .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("DC=cimpdomain1,DC=com")
+                .defaultValue("DC=%s,DC=com")
                 .add()
                 .property().name(LDAPConstants.USERS_DN).label("Users DN")
                 .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("CN=Users, DC=domain1, DC=com")
+                .defaultValue("CN=Users, DC=%s, DC=com")
+                .add()
+                .property().name(LDAPConstants.CUSTOM_USER_SEARCH_FILTER).label("User LDAP filter")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue(SEARCH_FILTER_STR)
                 .add()
                 .property().name(LDAPConstants.EDIT_MODE).label("Edit mode")
                 .type(ProviderConfigProperty.STRING_TYPE).defaultValue("READ_ONLY")

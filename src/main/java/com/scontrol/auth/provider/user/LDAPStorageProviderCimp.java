@@ -47,8 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.CONFIG_KEY_DOMAINNAME;
-import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.CONFIG_KEY_IP_ADDRESS;
+import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.*;
 import static com.scontrol.auth.provider.user.CimpUserStorageProviderFactory.domainsMap;
 
 public class LDAPStorageProviderCimp implements UserStorageProvider,
@@ -67,6 +66,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public static final String COLON = ":";
     public static final String CIMP_TAG = "[cimp] ";
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderCimp.class);
+    public static final String SEARCH_FILTER_STR = "(&(cn=%s)(objectclass=person)(objectclass=organizationalPerson)(objectclass=user))";
     private KeycloakSession ksession;
     //    private ComponentModel model;   //Todo Origin LDAP is:  UserStorageProviderModel model;
     private CimpUserStorageProviderModel model;
@@ -267,12 +267,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             if (domainMap == null) {
                 return null;
             }
+            String domainName = domainMap.get(CONFIG_KEY_DOMAINNAME);
             String domainIP = domainMap.get(CONFIG_KEY_IP_ADDRESS);
-            String searchBase = domainMap.get(LDAPConstants.BASE_DN);
-            //FixMe - here is we can use other params from
-//            String searchBase = SEARCH_BASE_PREFIX + domain + SEARCH_BASE_POSTFIX;("DC=domain1,DC=com")
+            String port = domainMap.get(CONFIG_KEY_PORT);
+            String searchBase = String.format(domainMap.get(LDAPConstants.BASE_DN), domainName);
+            String searchFilter = String.format(SEARCH_FILTER_STR, username_without_domain);
 
-            attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase);
+            attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase, port, searchFilter);
         } catch (NamingException e) {
             logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
@@ -313,7 +314,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
                     String memberStr = memberof.next().toString();
 
                     //Roles must be setted in Realm.JSON
-                    System.out.println(CIMP_TAG + "have member of: " + memberStr);
+                    logger.infof(CIMP_TAG + "have member of: " + memberStr);
                     if (memberStr.contains(LMOPERATOR_BO)) {
                         user.grantRole(realm.getRole(LMOPERATOR_BO));
                     }
