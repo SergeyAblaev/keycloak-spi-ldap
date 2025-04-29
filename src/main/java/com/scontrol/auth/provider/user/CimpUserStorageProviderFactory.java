@@ -79,15 +79,18 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .add()
                 .property().name(LDAPConstants.BASE_DN).label("Base DN")
                 .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("DC=%s,DC=com")
+                .defaultValue("CN=Users,DC=%s,DC=com")
+                .helpText(" %s = Domain name")
                 .add()
-                .property().name(LDAPConstants.USERS_DN).label("Users DN")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("CN=Users, DC=%s, DC=com")
-                .add()
+//                .property().name(LDAPConstants.USERS_DN).label("Users DN")
+//                .type(ProviderConfigProperty.STRING_TYPE)
+//                .defaultValue("CN=Users, DC=%s, DC=com")
+//                .helpText(" %s = Domain name")
+//                .add()
                 .property().name(LDAPConstants.CUSTOM_USER_SEARCH_FILTER).label("User LDAP filter")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue(SEARCH_FILTER_STR)
+                .helpText(" %s = Domain name")
                 .add()
                 .property().name(LDAPConstants.EDIT_MODE).label("Edit mode")
                 .type(ProviderConfigProperty.STRING_TYPE).defaultValue("READ_ONLY")
@@ -164,6 +167,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
             domainMap.put(LDAPConstants.USER_OBJECT_CLASSES, model.getConfig().getFirst(LDAPConstants.USER_OBJECT_CLASSES));
             domainMap.put(LDAPConstants.RDN_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE));
             domainMap.put(LDAPConstants.UUID_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE));
+            domainMap.put(LDAPConstants.CUSTOM_USER_SEARCH_FILTER, model.getConfig().getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER));
             domainsMap.put(domainname.toUpperCase(),domainMap);
         }
     }

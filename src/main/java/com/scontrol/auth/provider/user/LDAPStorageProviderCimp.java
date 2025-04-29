@@ -19,7 +19,6 @@ import org.keycloak.models.cache.CachedUserModel;
 import org.keycloak.models.cache.UserCache;
 import org.keycloak.models.credential.PasswordCredentialModel;
 import org.keycloak.models.utils.ReadOnlyUserModelDelegate;
-import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.storage.*;
 import org.keycloak.storage.adapter.InMemoryUserAdapter;
 import org.keycloak.storage.adapter.UpdateOnlyChangeUserModelDelegate;
@@ -66,7 +65,7 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
     public static final String COLON = ":";
     public static final String CIMP_TAG = "[cimp] ";
     private static final Logger logger = Logger.getLogger(LDAPStorageProviderCimp.class);
-    public static final String SEARCH_FILTER_STR = "(&(cn=%s)(objectclass=person)(objectclass=organizationalPerson)(objectclass=user))";
+    public static final String EMPTY_STRING = "";
     private KeycloakSession ksession;
     //    private ComponentModel model;   //Todo Origin LDAP is:  UserStorageProviderModel model;
     private CimpUserStorageProviderModel model;
@@ -271,9 +270,13 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             String domainIP = domainMap.get(CONFIG_KEY_IP_ADDRESS);
             String port = domainMap.get(CONFIG_KEY_PORT);
             String searchBase = String.format(domainMap.get(LDAPConstants.BASE_DN), domainName);
-            String searchFilter = String.format(SEARCH_FILTER_STR, username_without_domain);
+            String searchFilter = String.format(domainMap.get(LDAPConstants.CUSTOM_USER_SEARCH_FILTER), username_without_domain);
 
             attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase, port, searchFilter);
+            if (attributes == null) {
+                logger.errorf(" %s Directory server return an EMPTY attributes for user %s! Check 'User LDAP filter' is correct? ", CIMP_TAG, username_without_domain);
+                return null;
+            }
         } catch (NamingException e) {
             logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
@@ -283,16 +286,18 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         Map<String, String> rs = new HashMap<>(); //Todo - remove Map
         rs.put("username", username);
         Attribute mailAttribute = attributes.get("mail");
-        String mail;
+        String mail= EMPTY_STRING;
         if (mailAttribute != null) {
             mail = mailAttribute.toString();
-        } else {
-            mail = "";
+            int count = mail.indexOf(": ")+2;
+            if (mail.length()>count) {
+                mail = mail.substring(count+2);
+            }
         }
-        rs.put("email", mail.substring(mail.indexOf(": ")+2));
-        rs.put("firstName","");
-        rs.put("lastName","");
-        rs.put("birthDate","");
+        rs.put("email", mail);
+        rs.put("firstName", EMPTY_STRING); //Fixme - wtf here is EMPTY_STRING?
+        rs.put("lastName", EMPTY_STRING);   //Fixme - add parsing for this!
+        rs.put("birthDate", EMPTY_STRING);
 
         cashedCredentials.put(username, password);
 
