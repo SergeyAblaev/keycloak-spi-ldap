@@ -75,13 +75,13 @@ public class CimpStorageUserManager {
 
     public void setManagedProxiedUser(UserModel proxiedUser, LDAPObject ldapObject) {
         String userId = proxiedUser.getId();
-        ManagedUserEntry entry = managedUsers.get(userId);
+        CimpStorageUserManager.ManagedUserEntry entry = managedUsers.get(userId);
         if (entry != null) {
             throw new IllegalStateException("Don't expect to have entry for user " + userId);
         }
 
         LDAPTransactionCimp ldapTransaction = new LDAPTransactionCimp(provider, ldapObject);
-        ManagedUserEntry newEntry = new ManagedUserEntry(proxiedUser, ldapObject, ldapTransaction);
+        CimpStorageUserManager.ManagedUserEntry newEntry = new CimpStorageUserManager.ManagedUserEntry(proxiedUser, ldapObject, ldapTransaction);
         managedUsers.put(userId, newEntry);
     }
 
