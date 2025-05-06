@@ -36,16 +36,15 @@ import org.keycloak.storage.user.UserQueryProvider;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
 
-import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
-import javax.naming.directory.Attribute;
-import javax.naming.directory.Attributes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static com.scontrol.auth.provider.ldap.store.LdapConnectionUtils.MAIL;
+import static com.scontrol.auth.provider.ldap.store.LdapConnectionUtils.MEMBER_OF;
 import static com.scontrol.auth.provider.user.CimpUserStorageProviderConstants.*;
 import static com.scontrol.auth.provider.user.CimpUserStorageProviderFactory.domainsMap;
 
@@ -259,7 +258,18 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             password = cashedCredentials.get(username);
         }
 
-        Attributes attributes;
+        cashedCredentials.put(username, password);
+
+        CustomUser user = authADAndGetUser(realm, username, domain, username_without_domain, password);
+        if (user == null) return null;
+        logger.infof("cashedUserModels.put ksession: "+ ksession.toString());
+        cashedUserModels.put(username, user);
+
+        return user;
+    }
+
+    private CustomUser authADAndGetUser(RealmModel realm, String username, String domain, String username_without_domain, String password) {
+        Map<String, Set<String>> resultMap;
         try {
 
             Map<String, String> domainMap = domainsMap.get(domain.toUpperCase());
@@ -271,9 +281,11 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             String port = domainMap.get(CONFIG_KEY_PORT);
             String searchBase = String.format(domainMap.get(LDAPConstants.BASE_DN), domainName);
             String searchFilter = String.format(domainMap.get(LDAPConstants.CUSTOM_USER_SEARCH_FILTER), username_without_domain);
+            String usernameLDAPattribute = domainMap.get(LDAPConstants.USERNAME_LDAP_ATTRIBUTE);
+            String ldapProtocol = domainMap.get(LDAP_PROTOCOL);
 
-            attributes = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase, port, searchFilter);
-            if (attributes == null) {
+            resultMap = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase, port, searchFilter, usernameLDAPattribute, ldapProtocol);
+            if (resultMap.isEmpty()) {
                 logger.errorf(" %s Directory server return an EMPTY attributes for user %s! Check 'User LDAP filter' is correct? ", CIMP_TAG, username_without_domain);
                 return null;
             }
@@ -281,14 +293,15 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
             logger.errorf(" %s ldapConnection ERROR for user %s : %s ", CIMP_TAG, username_without_domain, e.getMessage());
             return null;
         }
-        logger.info("found user, attributes: "+ attributes);
+        logger.info("found user, attributes: "+ resultMap);
 
         Map<String, String> rs = new HashMap<>(); //Todo - remove Map
         rs.put("username", username);
-        Attribute mailAttribute = attributes.get("mail");
+
+        Set<String> mailSet = resultMap.get(MAIL);
         String mail= EMPTY_STRING;
-        if (mailAttribute != null) {
-            mail = mailAttribute.toString();
+        if (mailSet != null && !mailSet.isEmpty()) {
+            mail = mailSet.iterator().next();
             int count = mail.indexOf(": ")+2;
             if (mail.length()>count) {
                 mail = mail.substring(count+2);
@@ -299,51 +312,42 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         rs.put("lastName", EMPTY_STRING);   //Fixme - add parsing for this!
         rs.put("birthDate", EMPTY_STRING);
 
-        cashedCredentials.put(username, password);
-
 //Todo convert code for domain query!
         CustomUser user = new CustomUser.Builder(ksession, realm, model, rs.get("username"))
-
                 .email(rs.get("email"))
                 .firstName(rs.get("firstName"))
                 .lastName(rs.get("lastName"))
                 .birthDate(rs.get("birthDate"))
                 .build();
 
-        try {
-            Attribute memberofAttr = attributes.get("memberof");
-            if (memberofAttr != null) {
-                logger.infof(CIMP_TAG + "found memberof, attributes: " + memberofAttr); //for DOMAIN2 not found ANY!: memberof=memberOf: CN=LMOperatorBO,CN=Users,DC=cimpdomain1,DC=com, CN=Allowed RODC Password Replication Group,CN=Users,DC=cimpdomain1,DC=com
-                NamingEnumeration<?> memberof = memberofAttr.getAll();
-                while (memberof.hasMore()) {
-                    String memberStr = memberof.next().toString();
+        Set<String> memberofAttr = resultMap.get(MEMBER_OF);
+        if (memberofAttr != null) {
+            logger.infof(CIMP_TAG + "found memberof, attributes: " + memberofAttr); //for DOMAIN2 not found ANY!: memberof=memberOf: CN=LMOperatorBO,CN=Users,DC=cimpdomain1,DC=com, CN=Allowed RODC Password Replication Group,CN=Users,DC=cimpdomain1,DC=com
 
-                    //Roles must be setted in Realm.JSON
-                    logger.infof(CIMP_TAG + "have member of: " + memberStr);
-                    if (memberStr.contains(LMOPERATOR_BO)) {
-                        user.grantRole(realm.getRole(LMOPERATOR_BO));
-                    }
-                    if (memberStr.contains(LMVIEWER_BO)) {
-                        user.grantRole(realm.getRole(LMVIEWER_BO));
-                    }
-                    if (memberStr.contains(LMVIEWER_MKTG)) {
-                        user.grantRole(realm.getRole(LMVIEWER_MKTG));
-                    }
-                    if (memberStr.contains(LMOPERATOR_MKTG)) {
-                        user.grantRole(realm.getRole(LMOPERATOR_MKTG));
-                    }
-                }
-            } else {
-                logger.infof(CIMP_TAG + "not found ANY! memberof!"); //for DOMAIN2 not found ANY!: memberof=memberOf:
+            for (String memberStr : memberofAttr) {
+                grantRoleToUser(realm, memberStr, user);
             }
-        } catch (NamingException e) {
-            logger.error(CIMP_TAG + "ldap NamingException ERROR: " + e.getMessage());
-            // throw new RuntimeException(e);
+        } else {
+            logger.infof(CIMP_TAG + "not found ANY! memberof!"); //for DOMAIN2 not found ANY!: memberof=memberOf:
         }
-        logger.infof("cashedUserModels.put ksession: "+ ksession.toString());
-        cashedUserModels.put(username, user);
-
         return user;
+    }
+
+    private static void grantRoleToUser(RealmModel realm, String memberStr, CustomUser user) {
+        //Roles must be setted in Realm.JSON
+        logger.infof(CIMP_TAG + "have member of: " + memberStr);
+        if (memberStr.contains(LMOPERATOR_BO)) {
+            user.grantRole(realm.getRole(LMOPERATOR_BO));
+        }
+        if (memberStr.contains(LMVIEWER_BO)) {
+            user.grantRole(realm.getRole(LMVIEWER_BO));
+        }
+        if (memberStr.contains(LMVIEWER_MKTG)) {
+            user.grantRole(realm.getRole(LMVIEWER_MKTG));
+        }
+        if (memberStr.contains(LMOPERATOR_MKTG)) {
+            user.grantRole(realm.getRole(LMOPERATOR_MKTG));
+        }
     }
 
 

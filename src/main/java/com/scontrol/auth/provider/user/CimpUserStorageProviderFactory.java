@@ -61,14 +61,19 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
 //                .type(ProviderConfigProperty.STRING_TYPE)
 //                .defaultValue("ldap://192.168.1.18:389")
                 .add()
+                .property().name(LDAP_PROTOCOL).label("LDAP Protocol")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue("ldap")
+                .helpText("Example: ldap or ldaps")
+                .add()
                 .property().name(LDAPConstants.USERNAME_LDAP_ATTRIBUTE).label("Username LDAP attribute")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("cn")
                 .add()
-                .property().name(LDAPConstants.RDN_LDAP_ATTRIBUTE).label("RDN LDAP attribute")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue("cn")
-                .add()
+//                .property().name(LDAPConstants.RDN_LDAP_ATTRIBUTE).label("RDN LDAP attribute")
+//                .type(ProviderConfigProperty.STRING_TYPE)
+//                .defaultValue("cn")
+//                .add()
                 .property().name(LDAPConstants.UUID_LDAP_ATTRIBUTE).label("UUID LDAP attribute")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("obiectGUID")
@@ -168,6 +173,8 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
             domainMap.put(LDAPConstants.RDN_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE));
             domainMap.put(LDAPConstants.UUID_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE));
             domainMap.put(LDAPConstants.CUSTOM_USER_SEARCH_FILTER, model.getConfig().getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER));
+            domainMap.put(LDAPConstants.USERNAME_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.USERNAME_LDAP_ATTRIBUTE));
+            domainMap.put(LDAP_PROTOCOL, model.getConfig().getFirst(LDAP_PROTOCOL));
             domainsMap.put(domainname.toUpperCase(),domainMap);
         }
     }

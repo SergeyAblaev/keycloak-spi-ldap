@@ -5,4 +5,5 @@ public final class CimpUserStorageProviderConstants {
     public static final String CONFIG_KEY_DOMAINNAME = "domainName";
     public static final String CONFIG_KEY_PORT = "Port";
     public static final String CONFIG_KEY_VALIDATION_QUERY = "validationQuery";
+    public static final String LDAP_PROTOCOL = "ldapProtocol";
 }
