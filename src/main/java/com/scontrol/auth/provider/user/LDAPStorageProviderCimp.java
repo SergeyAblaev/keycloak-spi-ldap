@@ -5,6 +5,7 @@ package com.scontrol.auth.provider.user;
 
 import com.scontrol.auth.provider.ldap.store.LDAPIdentityStoreCimp;
 import com.scontrol.auth.provider.ldap.store.LdapConnectionUtils;
+import com.scontrol.auth.provider.ldap.store.LdapServerConfigDTO;
 import com.scontrol.auth.provider.mapper.CimpStorageMapperManager;
 import com.scontrol.auth.provider.mapper.LDAPStorageMapperCimp;
 import jakarta.ws.rs.core.MultivaluedMap;
@@ -272,19 +273,19 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         Map<String, Set<String>> resultMap;
         try {
 
-            Map<String, String> domainMap = domainsMap.get(domain.toUpperCase());
+            LdapServerConfigDTO domainMap = domainsMap.get(domain.toUpperCase());
             if (domainMap == null) {
                 return null;
             }
-            String domainName = domainMap.get(CONFIG_KEY_DOMAINNAME);
-            String domainIP = domainMap.get(CONFIG_KEY_IP_ADDRESS);
-            String port = domainMap.get(CONFIG_KEY_PORT);
-            String searchBase = String.format(domainMap.get(LDAPConstants.BASE_DN), domainName);
-            String searchFilter = String.format(domainMap.get(LDAPConstants.CUSTOM_USER_SEARCH_FILTER), username_without_domain);
-            String usernameLDAPattribute = domainMap.get(LDAPConstants.USERNAME_LDAP_ATTRIBUTE);
-            String ldapProtocol = domainMap.get(LDAP_PROTOCOL);
+            String domainName = domainMap.getDomainName();
+            List<String> domainIPs = domainMap.getIpAddress();
+            String port = domainMap.getPort();
+            String searchBase = String.format(domainMap.getBaseDn(), domainName);
+            String searchFilter = String.format(domainMap.getCustomUserSearchFilter(), username_without_domain);
+            String usernameLDAPattribute = domainMap.getUsernameLDAPAttribute();
+            String ldapProtocol = domainMap.getLdapProtocol();
 
-            resultMap = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIP, searchBase, port, searchFilter, usernameLDAPattribute, ldapProtocol);
+            resultMap = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIPs, searchBase, port, searchFilter, usernameLDAPattribute, ldapProtocol);
             if (resultMap.isEmpty()) {
                 logger.errorf(" %s Directory server return an EMPTY attributes for user %s! Check 'User LDAP filter' is correct? ", CIMP_TAG, username_without_domain);
                 return null;

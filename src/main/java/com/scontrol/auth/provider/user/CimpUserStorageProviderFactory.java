@@ -2,7 +2,9 @@ package com.scontrol.auth.provider.user;
 
 import com.scontrol.auth.provider.ldap.store.LDAPIdentityStoreCimp;
 import com.scontrol.auth.provider.ldap.store.LDAPIdentityStoreRegistryCimp;
+import com.scontrol.auth.provider.ldap.store.LdapServerConfigDTO;
 import org.keycloak.Config;
+import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
 import org.keycloak.models.*;
@@ -33,7 +35,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     public static final String CIMP_USER_PROVIDER = "cimp-user-provider";
     protected final List<ProviderConfigProperty> configProperties;
     private LDAPIdentityStoreRegistryCimp ldapStoreRegistry;
-    public static Map<String, Map<String, String>> domainsMap = new ConcurrentHashMap<>();
+    public static Map<String, LdapServerConfigDTO> domainsMap = new ConcurrentHashMap<>();
     public static final String SEARCH_FILTER_STR = "(&(cn=%s)(objectclass=person)(objectclass=organizationalPerson)(objectclass=user))";
 
     public CimpUserStorageProviderFactory() {
@@ -146,38 +148,82 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .build();
     }
 
-    //Todo used aal the time for user searsh
+    //Todo used all the time for user searsh
     @Override
     public LDAPStorageProviderCimp create(KeycloakSession session, ComponentModel model)  {
         logger.infof("[cimp] . creating new CustomUserStorageProvider");
 
+        MultivaluedHashMap<String, String> modelConfig = model.getConfig();
+        String domainname = modelConfig.getFirst(CONFIG_KEY_DOMAINNAME);
+        //todo check this in container!
+        if (domainsMap.get(domainname.toUpperCase()) == null) {
+            fillConfigIntoDomainsMap(modelConfig);
+        }
+
         Map<ComponentModel, LDAPConfigDecorator> configDecorators = getLDAPConfigDecorators(session, model);
         LDAPIdentityStoreCimp ldapIdentityStore = this.ldapStoreRegistry.getLdapStore(session, model, configDecorators);
 //        fillConfigIntoDomainsMap(model);
-        String domainname = model.getConfig().getFirst(CONFIG_KEY_DOMAINNAME);
         return new LDAPStorageProviderCimp(this, session, model, ldapIdentityStore, domainname);
     }
 
-    private static void fillConfigIntoDomainsMap(ComponentModel model) {
-        String domainname = model.getConfig().getFirst(CONFIG_KEY_DOMAINNAME);
+    private static void fillConfigIntoDomainsMap(MultivaluedHashMap<String, String> modelConfig) {
+//        MultivaluedHashMap<String, String> modelConfig = model.getConfig();
+        String domainname = modelConfig.getFirst(CONFIG_KEY_DOMAINNAME);
         logger.info(CIMP_TAG + "fillConfigIntoDomainsMap for " + domainname);
 
-         Map<String, String> domainMap = new HashMap<>();
+        //         Map<String, LdapServerConfigDTO> domainMap = new HashMap<>();
         if (domainname != null) {
-            domainMap.put(CONFIG_KEY_DOMAINNAME, domainname);
-            domainMap.put(CONFIG_KEY_IP_ADDRESS, model.getConfig().getFirst(CONFIG_KEY_IP_ADDRESS));
-            domainMap.put(CONFIG_KEY_PORT, model.getConfig().getFirst(CONFIG_KEY_PORT));
-            domainMap.put(CONFIG_KEY_VALIDATION_QUERY, model.getConfig().getFirst(CONFIG_KEY_VALIDATION_QUERY));
-            domainMap.put(LDAPConstants.BASE_DN, model.getConfig().getFirst(LDAPConstants.BASE_DN));
-            domainMap.put(LDAPConstants.USER_OBJECT_CLASSES, model.getConfig().getFirst(LDAPConstants.USER_OBJECT_CLASSES));
-            domainMap.put(LDAPConstants.RDN_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE));
-            domainMap.put(LDAPConstants.UUID_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE));
-            domainMap.put(LDAPConstants.CUSTOM_USER_SEARCH_FILTER, model.getConfig().getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER));
-            domainMap.put(LDAPConstants.USERNAME_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.USERNAME_LDAP_ATTRIBUTE));
-            domainMap.put(LDAP_PROTOCOL, model.getConfig().getFirst(LDAP_PROTOCOL));
-            domainsMap.put(domainname.toUpperCase(),domainMap);
+            String rawDomainIPs = modelConfig.getFirst(CONFIG_KEY_IP_ADDRESS);
+            List<String> domainIPs = parseDomainIPs(rawDomainIPs); //Fixme так а зачем парсить КАЖДЫЙ раз?! - парси сразу в мапу!!
+            LdapServerConfigDTO ldapServerConfigDTO = LdapServerConfigDTO.builder()
+                    .domainName(domainname)
+                    .ipAddress(domainIPs)
+                    .port(modelConfig.getFirst(CONFIG_KEY_PORT))
+                    .validationQuery(modelConfig.getFirst(CONFIG_KEY_VALIDATION_QUERY))
+                    .baseDn(modelConfig.getFirst(LDAPConstants.BASE_DN))
+                    .userObjectClasses(modelConfig.getFirst(LDAPConstants.USER_OBJECT_CLASSES))
+                    .rdnLDAPAttribute(modelConfig.getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE))
+                    .uuidLDAPAttribute(modelConfig.getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE))
+                    .customUserSearchFilter(modelConfig.getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER))
+                    .usernameLDAPAttribute(modelConfig.getFirst(LDAPConstants.USERNAME_LDAP_ATTRIBUTE))
+                    .ldapProtocol(modelConfig.getFirst(LDAP_PROTOCOL))
+                    .build();
+
+//            domainMap.put(CONFIG_KEY_DOMAINNAME, domainname);
+//            domainMap.put(CONFIG_KEY_IP_ADDRESS, domainIPs);
+//            domainMap.put(CONFIG_KEY_PORT, model.getConfig().getFirst(CONFIG_KEY_PORT));
+//            domainMap.put(CONFIG_KEY_VALIDATION_QUERY, model.getConfig().getFirst(CONFIG_KEY_VALIDATION_QUERY));
+//            domainMap.put(LDAPConstants.BASE_DN, model.getConfig().getFirst(LDAPConstants.BASE_DN));
+//            domainMap.put(LDAPConstants.USER_OBJECT_CLASSES, model.getConfig().getFirst(LDAPConstants.USER_OBJECT_CLASSES));
+//            domainMap.put(LDAPConstants.RDN_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.RDN_LDAP_ATTRIBUTE));
+//            domainMap.put(LDAPConstants.UUID_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.UUID_LDAP_ATTRIBUTE));
+//            domainMap.put(LDAPConstants.CUSTOM_USER_SEARCH_FILTER, model.getConfig().getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER));
+//            domainMap.put(LDAPConstants.USERNAME_LDAP_ATTRIBUTE, model.getConfig().getFirst(LDAPConstants.USERNAME_LDAP_ATTRIBUTE));
+//            domainMap.put(LDAP_PROTOCOL, model.getConfig().getFirst(LDAP_PROTOCOL));
+            domainsMap.put(domainname.toUpperCase(),ldapServerConfigDTO);
         }
     }
+
+    private static List<String> parseDomainIPs(String rawDomainIPs) {
+            List<String> domainIPs = new ArrayList<>();
+            if (rawDomainIPs == null || rawDomainIPs.isEmpty()) {
+                logger.warn(CIMP_TAG + "config 'rawDomainIPs' is null or empty!");
+                return domainIPs; //
+            }
+
+            String[] entries = rawDomainIPs.split(",");
+            for (String entry : entries) {
+                domainIPs.add(entry.trim());
+
+//            String[] keyValue = entry.split(":");
+//            if (keyValue.length == 2) {
+//                String domain = keyValue[0].trim().toUpperCase();
+//                String ip = keyValue[1].trim();
+//                domainMap.put(domain, ip);
+//            }
+            }
+            return domainIPs;
+        }
 
     protected Map<ComponentModel, LDAPConfigDecorator> getLDAPConfigDecorators(KeycloakSession session, ComponentModel ldapModel) {
         RealmModel realm = session.realms().getRealm(ldapModel.getParentId());
@@ -203,7 +249,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
         logger.info(CIMP_TAG + "getConfigProperties");
-        return configProperties;
+        return configProperties; //todo - here?    fillConfigIntoDomainsMap(model);
     }
 
     @Override
@@ -242,13 +288,13 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
         domainsMap.remove(oldDomainname);
         logger.infof(CIMP_TAG + "onUpdate(), remove "+oldDomainname);
 
-        fillConfigIntoDomainsMap(newModel);
+        fillConfigIntoDomainsMap(newModel.getConfig());
     }
 
     @Override
     public void onCreate(KeycloakSession session, RealmModel realm, ComponentModel model) {
         logger.infof(CIMP_TAG + "onCreate()");
-        fillConfigIntoDomainsMap(model);
+        fillConfigIntoDomainsMap(model.getConfig());
     }
 
 //    //    public SynchronizationResult sync(KeycloakSessionFactory sessionFactory, String realmId, UserStorageProviderModel model) {

@@ -23,58 +23,67 @@ public class LdapConnectionUtils {
 //        return connect2LdapSearchUser( userName, password, domainIp, search_base, port, searchFilter);
 //    }
 
-    public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, String domainIp, String search_base, String port, String searchFilter) throws NamingException {
+    public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, List<String> domainIps, String search_base, String port, String searchFilter) throws NamingException {
         String usernameLDAPattribute = "CN";
         String ldapProtocol = "ldap";
-        return connect2LdapSearchUser( userName, password, domainIp, search_base, port, searchFilter, usernameLDAPattribute, ldapProtocol);
+        return connect2LdapSearchUser( userName, password, domainIps, search_base, port, searchFilter, usernameLDAPattribute, ldapProtocol);
     }
 
-    public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, String domainIp,
+    public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, List<String> domainIps,
                                                                   String baseDN, String port, String searchFilter,
                                                                   String usernameLDAPattribute, String ldapProtocol) throws NamingException {
-        setEnv(userName,  password,  domainIp, baseDN, port, usernameLDAPattribute, ldapProtocol);
-        //debug
-        logger.infof("[cimp] connect2LdapSearchUser setEnv "+ENV.toString());
-        Map<String, Set<String>> resultMap = new HashMap<>();
 
-        // Create initial context
-        DirContext ctx = new InitialDirContext(ENV); //Authenticated
+        for (String domainIp : domainIps) {
+            setEnv(userName, password, domainIp, baseDN, port, usernameLDAPattribute, ldapProtocol);
 
-        SearchControls searchCtls = new SearchControls();
-// Specify the search scope
-        searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-        NamingEnumeration<?> results = ctx.search(baseDN, searchFilter, searchCtls);
-        Attributes attrs;
-        Set<String> mailSet = new HashSet<>(1);
+            // Create initial context
+            try {
+                DirContext ctx = new InitialDirContext(ENV); //Authenticated
 
-        Set<String> groupsSet = new HashSet<>();
-        String userDN = "";
-        if (results.hasMore()) {
-            SearchResult result = (SearchResult) results.next();
-            attrs = result.getAttributes();
-            //debug
-            logger.infof("[cimp] ldap search attrs: %s", attrs.toString());
+                SearchControls searchCtls = new SearchControls();
+                // Specify the search scope
+                searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                NamingEnumeration<?> results = ctx.search(baseDN, searchFilter, searchCtls);
 
-            Attribute mailAttribute = attrs.get(MAIL);
-            String mail = getMail(mailAttribute);
-            mailSet.add(mail);
 
-            Attribute memberOf = attrs.get(MEMBER_OF);
-            getGroups(memberOf, groupsSet);
+                Attributes attrs;
+                Set<String> mailSet = new HashSet<>(1);
 
-            userDN = result.getNameInNamespace(); //'CN=user8d2,CN=Users,DC=cimpdomain2,DC=com'
+                Set<String> groupsSet = new HashSet<>();
+                String userDN = "";
+                if (results.hasMore()) {
+                    SearchResult result = (SearchResult) results.next();
+                    attrs = result.getAttributes();
+                    //debug
+                    logger.infof("[cimp] ldap search attrs: %s", attrs.toString());
+
+                    Attribute mailAttribute = attrs.get(MAIL);
+                    String mail = getMail(mailAttribute);
+                    mailSet.add(mail);
+
+                    Attribute memberOf = attrs.get(MEMBER_OF);
+                    getGroups(memberOf, groupsSet);
+
+                    userDN = result.getNameInNamespace(); //'CN=user8d2,CN=Users,DC=cimpdomain2,DC=com'
+                }
+                if (groupsSet.isEmpty()) {
+                    // Fallback: Search for group membership manually
+                    logger.info(CIMP_TAG + "memberOf not found, using fallback search...");
+                    groupsSet = getGroupMembership(ctx, baseDN, userName, userDN);
+                }
+                results.close();
+                // Close the context when we're done
+                ctx.close();
+                Map<String, Set<String>> resultMap = new HashMap<>();
+                resultMap.put(MAIL, mailSet);
+                resultMap.put(MEMBER_OF, groupsSet);
+                return resultMap;
+            } catch (NamingException e) {
+                logger.error(CIMP_TAG + "Error connect for baseDN:" + baseDN + " ip:" + domainIp + " message:" + e.getMessage());
+                // continue to next server
+            }
         }
-        if (groupsSet.isEmpty()) {
-            // Fallback: Search for group membership manually
-            logger.info(CIMP_TAG + "memberOf not found, using fallback search...");
-            groupsSet = getGroupMembership(ctx, baseDN, userName, userDN);
-        }
-        results.close();
-// Close the context when we're done
-        ctx.close();
-        resultMap.put(MAIL,mailSet);
-        resultMap.put(MEMBER_OF,groupsSet);
-        return resultMap;
+        return Collections.emptyMap();
     }
 
     private static void getGroups(Attribute memberOf, Set<String> groupsSet) throws NamingException {
@@ -111,7 +120,8 @@ public class LdapConnectionUtils {
         // LDAPS-specific: Trust the server's SSL certificate (Java trusts by default, but you may customize this)
         // Optionally, set: javax.net.ssl.trustStore and trustStorePassword if using custom certs
 
-        // ENV.put(Context.PROVIDER_URL, url + "/" + baseDN); - ?? WTF 'baseDN'
+        //debug
+        logger.infof("[cimp] connect2LdapSearchUser setEnv "+ENV.toString());
     }
 
 
