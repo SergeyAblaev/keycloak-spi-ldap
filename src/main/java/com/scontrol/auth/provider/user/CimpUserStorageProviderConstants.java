@@ -6,4 +6,6 @@ public final class CimpUserStorageProviderConstants {
     public static final String CONFIG_KEY_PORT = "Port";
     public static final String CONFIG_KEY_VALIDATION_QUERY = "validationQuery";
     public static final String LDAP_PROTOCOL = "ldapProtocol";
+    public static final String READ_TIMEOUT = "readTimeout";
+    public static final String CONNECT_TIMEOUT = "connectTimeout";
 }

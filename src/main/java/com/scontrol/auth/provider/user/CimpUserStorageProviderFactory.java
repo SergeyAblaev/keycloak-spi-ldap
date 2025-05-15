@@ -66,7 +66,7 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .property().name(LDAP_PROTOCOL).label("LDAP Protocol")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("ldap")
-                .helpText("Example: ldap or ldaps")
+                .helpText("Example: 'ldap' or 'ldaps' ")
                 .add()
                 .property().name(LDAPConstants.USERNAME_LDAP_ATTRIBUTE).label("Username LDAP attribute")
                 .type(ProviderConfigProperty.STRING_TYPE)
@@ -99,12 +99,19 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                 .defaultValue(SEARCH_FILTER_STR)
                 .helpText(" %s = Domain name")
                 .add()
+                .property().name(READ_TIMEOUT).label("ldap.read.timeout")
+                .type(ProviderConfigProperty.STRING_TYPE).defaultValue("1000")
+                .add()
+                .property().name(CONNECT_TIMEOUT).label("ldap.connect.timeout")
+                .type(ProviderConfigProperty.STRING_TYPE).defaultValue("1000")
+                .add()
                 .property().name(LDAPConstants.EDIT_MODE).label("Edit mode")
                 .type(ProviderConfigProperty.STRING_TYPE).defaultValue("READ_ONLY")
                 .add()
                 .property().name(LDAPConstants.AUTH_TYPE).label("Bind type")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue("simple")
+
 //                .add()
 //                .property().name(LDAPConstants.BIND_DN).label("Bind DN")
 //                .type(ProviderConfigProperty.STRING_TYPE)
@@ -187,6 +194,8 @@ public class CimpUserStorageProviderFactory implements UserStorageProviderFactor
                     .customUserSearchFilter(modelConfig.getFirst(LDAPConstants.CUSTOM_USER_SEARCH_FILTER))
                     .usernameLDAPAttribute(modelConfig.getFirst(LDAPConstants.USERNAME_LDAP_ATTRIBUTE))
                     .ldapProtocol(modelConfig.getFirst(LDAP_PROTOCOL))
+                    .readTimeout(modelConfig.getFirst(READ_TIMEOUT))
+                    .connectTimeout(modelConfig.getFirst(CONNECT_TIMEOUT))
                     .build();
 
 //            domainMap.put(CONFIG_KEY_DOMAINNAME, domainname);

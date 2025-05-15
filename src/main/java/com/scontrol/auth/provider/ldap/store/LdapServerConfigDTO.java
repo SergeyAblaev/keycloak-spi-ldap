@@ -15,8 +15,10 @@ public class LdapServerConfigDTO {
     private String customUserSearchFilter;
     private String usernameLDAPAttribute;
     private String ldapProtocol;
+    private String readTimeout;
+    private String connectTimeout;
 
-    LdapServerConfigDTO(String domainName, List<String> ipAddress, String port, String validationQuery, String baseDn, String userObjectClasses, String rdnLDAPAttribute, String uuidLDAPAttribute, String customUserSearchFilter, String usernameLDAPAttribute, String ldapProtocol) {
+    LdapServerConfigDTO(String domainName, List<String> ipAddress, String port, String validationQuery, String baseDn, String userObjectClasses, String rdnLDAPAttribute, String uuidLDAPAttribute, String customUserSearchFilter, String usernameLDAPAttribute, String ldapProtocol, String readTimeout, String connectTimeout) {
         this.domainName = domainName;
         this.ipAddress = ipAddress;
         this.port = port;
@@ -28,6 +30,8 @@ public class LdapServerConfigDTO {
         this.customUserSearchFilter = customUserSearchFilter;
         this.usernameLDAPAttribute = usernameLDAPAttribute;
         this.ldapProtocol = ldapProtocol;
+        this.readTimeout = readTimeout;
+        this.connectTimeout = connectTimeout;
     }
 
     public static LdapServerConfigBuilder builder() {
@@ -78,6 +82,14 @@ public class LdapServerConfigDTO {
         return this.ldapProtocol;
     }
 
+    public String getReadTimeout() {
+        return readTimeout;
+    }
+
+    public String getConnectTimeout() {
+        return connectTimeout;
+    }
+
 
     public static class LdapServerConfigBuilder {
         private String domainName;
@@ -91,6 +103,8 @@ public class LdapServerConfigDTO {
         private String customUserSearchFilter;
         private String usernameLDAPAttribute;
         private String ldapProtocol;
+        private String connectTimeout;
+        private String readTimeout;
 
         LdapServerConfigBuilder() {
         }
@@ -150,12 +164,22 @@ public class LdapServerConfigDTO {
             return this;
         }
 
+        public LdapServerConfigBuilder connectTimeout(String connectTimeout) {
+            this.connectTimeout = connectTimeout;
+            return this;
+        }
+
+        public LdapServerConfigBuilder readTimeout(String readTimeout) {
+            this.readTimeout = readTimeout;
+            return this;
+        }
+
         public LdapServerConfigDTO build() {
-            return new LdapServerConfigDTO(this.domainName, this.ipAddress, this.port, this.validationQuery, this.baseDn, this.userObjectClasses, this.rdnLDAPAttribute, this.uuidLDAPAttribute, this.customUserSearchFilter, this.usernameLDAPAttribute, this.ldapProtocol);
+            return new LdapServerConfigDTO(this.domainName, this.ipAddress, this.port, this.validationQuery, this.baseDn, this.userObjectClasses, this.rdnLDAPAttribute, this.uuidLDAPAttribute, this.customUserSearchFilter, this.usernameLDAPAttribute, this.ldapProtocol, this.readTimeout, this.connectTimeout);
         }
 
         public String toString() {
-            return "LdapServerConfig.LdapServerConfigBuilder(domainName=" + this.domainName + ", ipAddress=" + this.ipAddress + ", port=" + this.port + ", validationQuery=" + this.validationQuery + ", baseDn=" + this.baseDn + ", userObjectClasses=" + this.userObjectClasses + ", rdnLDAPAttribute=" + this.rdnLDAPAttribute + ", uuidLDAPAttribute=" + this.uuidLDAPAttribute + ", customUserSearchFilter=" + this.customUserSearchFilter + ", usernameLDAPAttribute=" + this.usernameLDAPAttribute + ", ldapProtocol=" + this.ldapProtocol + ")";
+            return "LdapServerConfig.LdapServerConfigBuilder(domainName=" + this.domainName + ", ipAddress=" + this.ipAddress + ", port=" + this.port + ", validationQuery=" + this.validationQuery + ", baseDn=" + this.baseDn + ", userObjectClasses=" + this.userObjectClasses + ", rdnLDAPAttribute=" + this.rdnLDAPAttribute + ", uuidLDAPAttribute=" + this.uuidLDAPAttribute + ", customUserSearchFilter=" + this.customUserSearchFilter + ", usernameLDAPAttribute=" + this.usernameLDAPAttribute + ", ldapProtocol=" + this.ldapProtocol + ", readTimeout=" + this.readTimeout + ", connectTimeout=" + this.connectTimeout + ")";
         }
     }
 }

@@ -26,15 +26,16 @@ public class LdapConnectionUtils {
     public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, List<String> domainIps, String search_base, String port, String searchFilter) throws NamingException {
         String usernameLDAPattribute = "CN";
         String ldapProtocol = "ldap";
-        return connect2LdapSearchUser( userName, password, domainIps, search_base, port, searchFilter, usernameLDAPattribute, ldapProtocol);
+        return connect2LdapSearchUser( userName, password, domainIps, search_base, port, searchFilter, usernameLDAPattribute, ldapProtocol, "1000", "1000");
     }
 
     public static Map<String, Set<String>> connect2LdapSearchUser(String userName, String password, List<String> domainIps,
                                                                   String baseDN, String port, String searchFilter,
-                                                                  String usernameLDAPattribute, String ldapProtocol) throws NamingException {
+                                                                  String usernameLDAPattribute, String ldapProtocol,
+                                                                  String readTimeout, String connectTimeout) throws NamingException {
 
         for (String domainIp : domainIps) {
-            setEnv(userName, password, domainIp, baseDN, port, usernameLDAPattribute, ldapProtocol);
+            setEnv(userName, password, domainIp, baseDN, port, usernameLDAPattribute, ldapProtocol, readTimeout, connectTimeout);
 
             // Create initial context
             try {
@@ -83,7 +84,7 @@ public class LdapConnectionUtils {
                 // continue to next server
             }
         }
-        return Collections.emptyMap();
+        throw new NamingException(CIMP_TAG + "Error connect for all ip's baseDN:" + baseDN);
     }
 
     private static void getGroups(Attribute memberOf, Set<String> groupsSet) throws NamingException {
@@ -107,11 +108,14 @@ public class LdapConnectionUtils {
         return mail;
     }
 
-    private static void setEnv(String userName, String password, String domainIp, String search_base, String port, String usernameLDAPattribute, String ldapProtocol) {
+    private static void setEnv(String userName, String password, String domainIp, String search_base, String port, String usernameLDAPattribute,
+                               String ldapProtocol, String readTimeout, String connectTimeout) {
         ENV.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
         ENV.put(Context.SECURITY_AUTHENTICATION, "simple");
         ENV.put(Context.SECURITY_PRINCIPAL, usernameLDAPattribute + "=" + userName + "," + search_base);  // Connected to LDAP successfully with 'DC=cimpdomain1,DC=com'
         ENV.put(Context.SECURITY_CREDENTIALS, password);
+        ENV.put("com.sun.jndi.ldap.read.timeout", readTimeout);
+        ENV.put("com.sun.jndi.ldap.connect.timeout", connectTimeout);
 //        String ldapProtocol = "ldap";
         ENV.put(Context.PROVIDER_URL, ldapProtocol + "://" + domainIp + ":" + port);
         // ENV.put(Context.PROVIDER_URL, "ldaps://" + domainIp+ ":" + port); // LDAPS

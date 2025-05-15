@@ -273,19 +273,22 @@ public class LDAPStorageProviderCimp implements UserStorageProvider,
         Map<String, Set<String>> resultMap;
         try {
 
-            LdapServerConfigDTO domainMap = domainsMap.get(domain.toUpperCase());
-            if (domainMap == null) {
+            LdapServerConfigDTO configDTO = domainsMap.get(domain.toUpperCase());
+            if (configDTO == null) {
                 return null;
             }
-            String domainName = domainMap.getDomainName();
-            List<String> domainIPs = domainMap.getIpAddress();
-            String port = domainMap.getPort();
-            String searchBase = String.format(domainMap.getBaseDn(), domainName);
-            String searchFilter = String.format(domainMap.getCustomUserSearchFilter(), username_without_domain);
-            String usernameLDAPattribute = domainMap.getUsernameLDAPAttribute();
-            String ldapProtocol = domainMap.getLdapProtocol();
+            String domainName = configDTO.getDomainName();
+            List<String> domainIPs = configDTO.getIpAddress();
+            String port = configDTO.getPort();
+            String searchBase = String.format(configDTO.getBaseDn(), domainName);
+            String searchFilter = String.format(configDTO.getCustomUserSearchFilter(), username_without_domain);
+            String usernameLDAPattribute = configDTO.getUsernameLDAPAttribute();
+            String ldapProtocol = configDTO.getLdapProtocol();
+            String readTimeout = configDTO.getReadTimeout();
+            String connectTimeout = configDTO.getConnectTimeout();
 
-            resultMap = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIPs, searchBase, port, searchFilter, usernameLDAPattribute, ldapProtocol);
+            resultMap = LdapConnectionUtils.connect2LdapSearchUser(username_without_domain, password, domainIPs, searchBase, port, searchFilter,
+                    usernameLDAPattribute, ldapProtocol, readTimeout, connectTimeout);
             if (resultMap.isEmpty()) {
                 logger.errorf(" %s Directory server return an EMPTY attributes for user %s! Check 'User LDAP filter' is correct? ", CIMP_TAG, username_without_domain);
                 return null;
